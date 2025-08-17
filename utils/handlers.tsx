@@ -18,6 +18,7 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
         return;
     }
 
+    const { allowUnicode } = settings.store;
     let { favoriteableId, favoriteableName, favoriteableType } = props;
     const { itemSrc, itemSafeSrc, message, channel, mediaItem, contextMenuAPIArguments } = props;
     const target = contextMenuAPIArguments?.[0]?.target;
@@ -85,10 +86,12 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
     }
 
     if (isRoleIcon) {
+        const parsedURL = parseURL(roleIconTarget.src.replace(CDN_BASE, MEDIA_PROXY_BASE));
         const isUnicodeRoleIcon = itemSrc.startsWith(PRIMARY_DOMAIN_BASE);
         const isCustomRoleIcon = !isUnicodeRoleIcon;
         const roleID = GuildMemberStore.getMember(channel.guild_id, message.author.id)?.iconRoleId;
         const role = roleID ? GuildRoleStore.getRole(channel.guild_id, roleID) : null;
+        const sanitizedRoleName = role ? sanitizeFilename(role.name, allowUnicode) : null;
 
         downloadifyItems.push(
             <Menu.MenuItem
@@ -98,8 +101,8 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
                 icon={() => ImageIcon({ width: 20, height: 20 })}
                 action={async () => {
                     await handleDownload(
-                        parseURL(roleIconTarget.src.replace(CDN_BASE, MEDIA_PROXY_BASE)),
-                        `${role?.name}-icon` || null,
+                        parsedURL,
+                        sanitizedRoleName ? `${sanitizedRoleName}-icon` : null,
                         isCustomRoleIcon ? assetAvailability["role-icon-custom"] : assetAvailability["role-icon-unicode-emoji"],
                         false
                     );
@@ -108,6 +111,7 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
         );
     } else if (clanBadgeTarget && !!(message.author as any).primaryGuild) {
         const { primaryGuild } = (message.author as any);
+        const sanitizedGuildTag = sanitizeFilename(primaryGuild.tag, allowUnicode);
 
         downloadifyItems.push(
             <Menu.MenuItem
@@ -118,7 +122,7 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
                 action={async () => {
                     await handleDownload(
                         parseURL(clanBadgeTarget.src.replace(CDN_BASE, MEDIA_PROXY_BASE)),
-                        `${primaryGuild.tag}-clan-badge` || null,
+                        sanitizedGuildTag ? `${sanitizedGuildTag}-clan-badge` : null,
                         assetAvailability["clan-badge"],
                         false
                     );
@@ -857,9 +861,9 @@ async function handleDownload(
     extensions.length < 1 && url.extension && extensions.push(url.extension);
     const { defaultDirectory, overwriteFiles, displayStatus, allowUnicode, statusDuration } = settings.store;
     const baseName = alias
-        ? sanitizeFilename(alias, allowUnicode)
+        ? sanitizeFilename(alias, allowUnicode, "discord-download")
         : url.baseName
-            ? sanitizeFilename(url.baseName, allowUnicode)
+            ? sanitizeFilename(url.baseName, allowUnicode, "discord-download")
             : "discord-download";
 
     let chosenExtension = extensions[0] ?? "";

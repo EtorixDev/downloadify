@@ -80,7 +80,7 @@ export function parseURL(url: string): ParsedURL {
 /**
  * Sanitize a file name by replacing invalid characters with underscores.
  */
-export function sanitizeFilename(filename: string, allowUnicode: boolean): string {
+export function sanitizeFilename(filename: string, allowUnicode: boolean, fallback?: string): string {
     let sanitized = filename.replace(/[<>:"/\\|?*\x00-\x1F]/g, "_") // windows-reserved
         .replace(/^\./, "_") // dot files
         .replace(/(\.\.)+/g, "_") // relative paths
@@ -93,7 +93,7 @@ export function sanitizeFilename(filename: string, allowUnicode: boolean): strin
     }
 
     sanitized = sanitized.replace(/^_+|_+$/g, ""); // leading and trailing underscores
-    return !sanitized.trim() || sanitized.split("").every(char => char === "_") ? "discord-download" : sanitized;
+    return sanitized || fallback || "";
 }
 
 /**
