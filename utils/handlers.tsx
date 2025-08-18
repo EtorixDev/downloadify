@@ -869,7 +869,7 @@ async function handleDownload(
     let chosenExtension = extensions[0] ?? "";
     let resolvedExtension = (chosenExtension).replace("apng", "png").replace("awebp", "webp");
     let resolvedPath: string | null = null;
-    let resolvedURL: string | null = null;
+    let resolvedURL = url.original;
 
     if (defaultDirectory) {
         const resolvedDirectory = defaultDirectory.trim().replace(/^["']|["']$/g, "").replace(/[/\\]+$/, "").replace(/\\/g, "/");
@@ -950,8 +950,6 @@ async function handleDownload(
             }
 
             resolvedURL = newURL.href;
-            DownloadifyLogger.info(`[${getFormattedNow()}] [STARTING DOWNLOAD]\n${resolvedPath}\n${resolvedURL}`);
-            success = await DownloadifyNative.downloadURL(resolvedURL, resolvedPath);
         } else if (asset.source === AssetSource.CDN) {
             if (asset.type === "nameplate") {
                 resolvedURL = url.host + url.path + (
@@ -965,9 +963,6 @@ async function handleDownload(
                 // Currently only the LOTTIE sticker.
                 resolvedURL = url.original;
             }
-
-            DownloadifyLogger.info(`[${getFormattedNow()}] [STARTING DOWNLOAD]\n${resolvedPath}\n${resolvedURL}`);
-            success = await DownloadifyNative.downloadURL(resolvedURL, resolvedPath);
         } else if (asset.source === AssetSource.TENOR) {
             const tenorID = url.path.replaceAll("/", "").slice(0, -2);
 
@@ -980,14 +975,12 @@ async function handleDownload(
                 displayStatus && showToast("Unsupported Tenor Extension", Toasts.Type.FAILURE, { duration: statusDuration * 1000 });
                 return;
             }
-
-            DownloadifyLogger.info(`[${getFormattedNow()}] [STARTING DOWNLOAD]\n${resolvedPath}\n${resolvedURL}`);
-            success = await DownloadifyNative.downloadURL(resolvedURL, resolvedPath);
         } else if ([AssetSource.EXTERNAL, AssetSource.PRIMARY_DOMAIN].includes(asset.source)) {
             resolvedURL = url.original;
-            DownloadifyLogger.info(`[${getFormattedNow()}] [STARTING DOWNLOAD]\n${resolvedPath}\n${resolvedURL}`);
-            success = await DownloadifyNative.downloadURL(resolvedURL, resolvedPath);
         }
+
+        DownloadifyLogger.info(`[${getFormattedNow()}] [STARTING DOWNLOAD]\n${resolvedPath}\n${resolvedURL}`);
+        success = await DownloadifyNative.downloadURL(resolvedURL, resolvedPath);
 
         if (success) {
             DownloadifyLogger.info(`[${getFormattedNow()}] [DOWNLOAD SUCCESS]\n${resolvedPath}\n${resolvedURL}`);
