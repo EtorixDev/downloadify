@@ -2,7 +2,7 @@
 
 Download various assets directly in Discord without having to open a browser or dig through HTML.
 
-Available as a userplugin (you're here!) in the desktop versions of [Vencord](https://github.com/Vendicated/Vencord/) and [Equicord](https://github.com/Equicord/Equicord) (a Vencord fork).
+Available natively in [Equicord](https://github.com/Equicord/Equicord), a Vencord fork, or as a userplugin (you're here!) in [Vencord](https://github.com/Vendicated/Vencord/).
 
 ## Features
 1. Download non-image files such as ZIP files directly inside of Discord.
