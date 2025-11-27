@@ -20,3 +20,4 @@ A few things not yet implemented.
 2. Status emojis as part of the `user-context` menu instead of just on their own.
 3. Current activity assets, both on their own and as part of the `user-context` menu.
 4. Various SVGs, AutoMod icon, profile icons, etc.
+5. Improve default file names across handlers.
