@@ -151,10 +151,19 @@ export default definePlugin({
             // Adds a context menu to emojis anywhere that isn't message content (profiles, reactions, etc).
             // Message emojis are handled by the message-context handler.
             find: "jumboable:\"jumbo\"",
-            replacement: {
-                match: /(?="data-type")/,
-                replace: "onContextMenu:(event)=>{$self.EmojiProfileContextMenu(event,arguments[0])},"
-            }
+            group: true,
+            replacement: [
+                {
+                    // Custom Emojis.
+                    match: /(?="data-type")/,
+                    replace: "onContextMenu:(event)=>{$self.EmojiProfileContextMenu(event,arguments[0])},"
+                },
+                {
+                    // Unicode Emojis.
+                    match: /(?=draggable)/,
+                    replace: "onContextMenu:(event)=>{console.log(arguments);console.log(t);$self.EmojiProfileContextMenu(event,arguments[0])},"
+                }
+            ]
         },
         {
             // Adds a context menu to connection icons on profiles.

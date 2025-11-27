@@ -92,7 +92,7 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
                 data["videos"] = [];
             }
 
-            if (!tenor && data["videos"]?.length === 0 && embed.thumbnail) {
+            if (!tenor && data["videos"].length === 0 && embed.thumbnail) {
                 const parsedThumbnailURL = parseURL(embed.thumbnail.url);
                 const parsedThumbnailURLIsTrusted = parsedThumbnailURL?.source && parsedThumbnailURL.source !== AssetSource.UNKNOWN;
                 const thumbnailURL = (parsedThumbnailURLIsTrusted ? embed.thumbnail.url : embed.thumbnail.proxyURL) || null;
@@ -2249,8 +2249,15 @@ export function ExpressionPickerContextMenu(children: Array<any>, props: { targe
 
 export function EmojiProfileContextMenu(event: React.MouseEvent<HTMLButtonElement>, props: EmojiContextMenuProps) {
     const isMessageEmoji = !!props.messageId;
-    const isUnicode = !!props.alt;
+    const isUnicode = (!!props.alt || !!props.emojiName) && !props.emojiId;
     const isCustom = !!props.emojiId;
+
+    DownloadifyLogger.info(`[${getFormattedNow()}] [PROFILE EMOJI CONTEXT MENU OPENED]\n`, props, event);
+
+    if (isUnicode && !props.alt) {
+        const emoji = getUnicodeEmojiData(props.emojiName);
+        emoji && (props = { animated: false, emojiName: emoji.name, src: emoji.path });
+    }
 
     if (isMessageEmoji || (!isUnicode && !isCustom) || (isUnicode && isCustom)) {
         return;
@@ -2258,8 +2265,6 @@ export function EmojiProfileContextMenu(event: React.MouseEvent<HTMLButtonElemen
         event.preventDefault();
         event.stopPropagation();
     }
-
-    DownloadifyLogger.info(`[${getFormattedNow()}] [PROFILE EMOJI CONTEXT MENU OPENED]\n`, props, event);
 
     const { animated, src } = props;
     const emojiCustomID = props.emojiId ?? null;
