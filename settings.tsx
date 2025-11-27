@@ -8,22 +8,34 @@ import "./style.css";
 
 import { definePluginSettings } from "@api/Settings";
 import ErrorBoundary from "@components/ErrorBoundary";
+import { Heading } from "@components/Heading";
+import { Paragraph } from "@components/Paragraph";
 import { OptionType } from "@utils/types";
-import { Button, Forms, showToast, Toasts, useState } from "@webpack/common";
+import { Button, showToast, Toasts, useEffect, useState } from "@webpack/common";
 import { JSX } from "react";
 
-import { d, DownloadifyLogger, DownloadifyNative } from "./utils/definitions";
 import { getFormattedNow } from "./utils/misc";
+import { d, DownloadifyLogger, DownloadifyNative } from "./utils/nonative";
 
 function DefaultDirectorySetting(): JSX.Element {
-    const { defaultDirectory } = settings.use(["defaultDirectory"]);
+    const [defaultDirectory, setDefaultDirectory] = useState<string | null>(null);
     const [isDialogueOpen, setDialogueOpen] = useState(false);
+
+    useEffect(() => {
+        const loadDefaultDirectory = async () => {
+            const dir = await DownloadifyNative.getDownloadDirectory();
+            setDefaultDirectory(dir);
+        };
+
+        loadDefaultDirectory();
+    }, []);
 
     const handlePickDirectory = async () => {
         try {
             setDialogueOpen(true);
-            const directory = await DownloadifyNative.getDirectory();
-            directory && (settings.store.defaultDirectory = directory);
+            await DownloadifyNative.setDownloadDirectory();
+            const newDir = await DownloadifyNative.getDownloadDirectory();
+            setDefaultDirectory(newDir);
         } catch (error) {
             DownloadifyLogger.error(`[${getFormattedNow()}] [FAILED TO SET DOWNLOAD DIRECTORY]`, error);
             showToast("Failed to set download directory.", Toasts.Type.FAILURE, { duration: 3000 });
@@ -32,23 +44,24 @@ function DefaultDirectorySetting(): JSX.Element {
         }
     };
 
-    const handleClearDirectory = () => {
-        settings.store.defaultDirectory = "";
+    const handleClearDirectory = async () => {
+        DownloadifyNative.clearDownloadDirectory();
+        setDefaultDirectory(null);
     };
 
     return (
         <ErrorBoundary>
-            <Forms.FormSection>
-                <Forms.FormTitle className={d("form-title")}>
+            <section>
+                <Heading className={d("form-title")}>
                     Default Directory
-                </Forms.FormTitle>
-                <Forms.FormText className={d("form-description")}>
+                </Heading>
+                <Paragraph className={d("form-description")}>
                     Default download location. If set, the file will always be downloaded in its original format even if alternatives are available. Leave empty to pick a folder and file type each time.
-                </Forms.FormText>
+                </Paragraph>
                 <div className={d("directory-container")}>
-                    <Forms.FormText className={d("directory-display")}>
+                    <Paragraph className={d("directory-display")}>
                         {defaultDirectory || "No Directory Set"}
-                    </Forms.FormText>
+                    </Paragraph>
                     <div className={d("directory-buttons")}>
                         <Button
                             disabled={isDialogueOpen}
@@ -68,7 +81,7 @@ function DefaultDirectorySetting(): JSX.Element {
                         </Button>
                     </div>
                 </div>
-            </Forms.FormSection>
+            </section>
         </ErrorBoundary>
     );
 }

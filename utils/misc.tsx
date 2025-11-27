@@ -4,27 +4,216 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { findGroupChildrenByChildId } from "@api/ContextMenu";
-import { Menu } from "@webpack/common";
+import { ASSET_MEDIA_PROXY_BASE, ASSET_TYPE_EXTRACTOR, AssetInfo, AssetSource, AssetType, ATTACHMENT_MEDIA_PROXY_BASE, AvatarDecoration, CDN_BASE, Collectible, CollectibleType, EQUICORD_BASE, EQUICORD_IMAGES_BASE, IMAGE_EXT_1_DOMAIN_BASE, IMAGE_EXT_2_DOMAIN_BASE, Nameplate, ParsedFile, ParsedURL, PRIMARY_DOMAIN_BASE, ProfileEffect, RESERVED_NAMES, TENOR_BASE_1, TENOR_BASE_2, TWITTER_DOMAIN_BASE, VENCORD_BADGES_BASE, VENCORD_BASE, WIKIMEDIA_DOMAIN_BASE } from "./definitions";
 
-import { InsertGroup, ParsedFile, ParsedURL } from "./definitions";
+function toProfileEffect(data: any): ProfileEffect {
+    return {
+        type: CollectibleType.PROFILE_EFFECT,
+        id: data.id,
+        sku_id: data.sku_id,
+        name: data.name,
+        title: data.title,
+        description: data.description,
+        accessibilityLabel: data.accessibilityLabel,
+        thumbnailPreviewSrc: data.thumbnailPreviewSrc,
+        reducedMotionSrc: data.reducedMotionSrc,
+        effects: data.effects.map((effect: any) => ({ src: effect.src })),
+    };
+}
+
+function toNameplate(data: any): Nameplate {
+    return {
+        type: CollectibleType.NAMEPLATE,
+        id: data.id,
+        sku_id: data.sku_id,
+        name: data.name,
+        asset: data.asset,
+        label: data.label,
+        palette: data.palette,
+    };
+}
+
+function toAvatarDecoration(data: any): AvatarDecoration {
+    return {
+        type: CollectibleType.AVATAR_DECORATION,
+        id: data.id,
+        sku_id: data.sku_id,
+        name: data.name,
+        asset: data.asset,
+        label: data.label,
+    };
+}
+
+/**
+ * Prune collectible data to keep relevant attributes.
+ */
+export function sanitizeCollectible(data: any): Collectible | null {
+    switch (data?.type) {
+        case CollectibleType.AVATAR_DECORATION:
+            return toAvatarDecoration(data);
+
+        case CollectibleType.PROFILE_EFFECT:
+            return toProfileEffect(data);
+
+        case CollectibleType.NAMEPLATE:
+            return toNameplate(data);
+
+        default:
+            return null;
+    }
+}
+
+/**
+ * Escapes characters in a string that have a special meaning in a regular expression.
+ */
+function escapeRegExp(str: string): string {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/**
+ * Sanitize a file name by replacing invalid characters with underscores.
+ */
+export function sanitizeFilename(filename: string, {
+    allowUnicode = true,
+    allowSpaces = false,
+    replacement = "-",
+    useFallback = false,
+    splitExtension = false
+}: {
+    allowUnicode?: boolean;
+    allowSpaces?: boolean;
+    replacement?: string;
+    useFallback?: boolean;
+    splitExtension?: boolean;
+}): string | null {
+    let sanitized = parseFile(splitExtension ? filename : filename.replaceAll(".", replacement)).baseName;
+
+    sanitized = sanitized
+        .replace(/[<>:"/\\|?*\x00-\x1F]/g, replacement) // windows-reserved characters
+        .replace(/\.\./g, replacement) // path traversal
+        .replace(/[/\\]/g, replacement) // path separators
+        .replace(/^\.+/, replacement) // leading dots
+        .replace(/\.+$/g, replacement) // trailing dots
+        .replace(/^[A-Za-z]:/g, replacement) // Windows drive letters (C:, D:, etc.)
+        .replace(/^~/, replacement) // Unix home directory
+        .replace(/[\t\n\r]+/g, replacement); // whitespace
+
+    if (!allowSpaces) {
+        sanitized = sanitized.replace(/\s+/g, replacement); // spaces
+    }
+
+    if (!allowUnicode) {
+        sanitized = sanitized.replace(/[^\x00-\x7F]/g, replacement);
+    }
+
+    if (RESERVED_NAMES.includes(sanitized.toUpperCase())) {
+        sanitized = "";
+    }
+
+    const escapedReplacement = escapeRegExp(replacement);
+
+    sanitized = sanitized
+        .replace(new RegExp(`${escapedReplacement}+`, "g"), replacement) // consecutive replacements
+        .replace(new RegExp(`^${escapedReplacement}+|${escapedReplacement}+$`, "g"), ""); // leading/trailing replacements
+
+    return sanitized || (useFallback ? "discord-download" : null);
+}
+
+/**
+ * Check if a file size in bytes exceeds a given threshold in megabytes.
+ */
+export function fileThreshold(size: number | null, threshold: number): boolean {
+    return !size || size > threshold * 1024 * 1024;
+}
+
+export function SVG2URL(svg: SVGElement): string {
+    const svgClone = svg.cloneNode(true) as SVGElement;
+    const originalElements = [svg, ...Array.from(svg.children)];
+    const clonedElements = [svgClone, ...Array.from(svgClone.children)];
+
+    originalElements.forEach((originalElement, index) => {
+        const clonedElement = clonedElements[index] as SVGElement;
+        const computedStyle = window.getComputedStyle(originalElement);
+        const stylesToInline = ["fill", "stroke", "color"];
+
+        stylesToInline.forEach(prop => {
+            const value = computedStyle.getPropertyValue(prop).trim();
+
+            if (value && value !== "none") {
+                clonedElement.setAttribute(prop, value);
+            }
+        });
+    });
+
+    const svgString = new XMLSerializer().serializeToString(svgClone);
+    const url = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgString)}`;
+
+    return url;
+}
+
+/** Determine the source of an asset based on its URL. */
+export function getAssetSource(url: URL): AssetSource {
+    if (url.protocol === "data:" && url.pathname.startsWith("image/svg+xml")) {
+        return AssetSource.DATA_SVG;
+    }
+
+    if (["canary.discord.com", "ptb.discord.com"].includes(url.host)) {
+        url.host = "discord.com";
+    }
+
+    const isMediaProxy = url.origin === ASSET_MEDIA_PROXY_BASE.origin;
+    const isAttachmentMediaProxy = isMediaProxy && url.pathname.startsWith(ATTACHMENT_MEDIA_PROXY_BASE.pathname);
+    const isAssetMediaProxy = isMediaProxy && !isAttachmentMediaProxy;
+    const isPrimaryDomain = url.origin === PRIMARY_DOMAIN_BASE.origin;
+    const isCDN = url.origin === CDN_BASE.origin;
+    const isImageExt1 = url.origin === IMAGE_EXT_1_DOMAIN_BASE.origin;
+    const isImageExt2 = url.origin === IMAGE_EXT_2_DOMAIN_BASE.origin;
+    const isImageExt = isImageExt1 || isImageExt2;
+    const isWikimedia = url.origin === WIKIMEDIA_DOMAIN_BASE.origin;
+    const isTwitter = url.origin === TWITTER_DOMAIN_BASE.origin;
+    const isTenor = [TENOR_BASE_1.origin, TENOR_BASE_2.origin].includes(url.origin);
+    const isVencord = [VENCORD_BASE.origin, VENCORD_BADGES_BASE.origin].includes(url.origin);
+    const isEquicord = [EQUICORD_BASE.origin, EQUICORD_IMAGES_BASE.origin].includes(url.origin);
+
+    if (isAttachmentMediaProxy) {
+        return AssetSource.ATTACHMENT_MEDIA_PROXY;
+    } else if (isAssetMediaProxy) {
+        return AssetSource.ASSET_MEDIA_PROXY;
+    } else if (isPrimaryDomain) {
+        return AssetSource.PRIMARY_DOMAIN;
+    } else if (isCDN) {
+        return AssetSource.CDN;
+    } else if (isImageExt) {
+        return AssetSource.EXTERNAL_IMAGE_PROXY;
+    } else if (isWikimedia) {
+        return AssetSource.WIKIMEDIA;
+    } else if (isTwitter) {
+        return AssetSource.TWITTER;
+    } else if (isTenor) {
+        return AssetSource.TENOR;
+    } else if (isVencord || isEquicord) {
+        return AssetSource.VENCORD;
+    } else {
+        return AssetSource.UNKNOWN;
+    }
+}
 
 /**
  * Retrieve information about a file path by parsing its parts.
  */
 export function parseFile(filePath: string): ParsedFile {
     const parts = filePath.split(/[\\/]/);
-    let fileNameWithExtra = parts.pop() as string;
+    const fileNameWithExtra = parts.pop() as string;
+    let fileNameWithExtraDecoded = fileNameWithExtra;
 
-    while (fileNameWithExtra.includes("%25")) {
-        fileNameWithExtra = decodeURIComponent(fileNameWithExtra);
+    while (fileNameWithExtraDecoded.includes("%25")) {
+        fileNameWithExtraDecoded = decodeURIComponent(fileNameWithExtraDecoded);
     }
 
-    fileNameWithExtra = decodeURIComponent(fileNameWithExtra);
+    fileNameWithExtraDecoded = decodeURIComponent(fileNameWithExtraDecoded);
 
-    const posColon = fileNameWithExtra.indexOf(":");
-    const fileNameWithoutExtra = posColon === -1 ? fileNameWithExtra : fileNameWithExtra.slice(0, posColon);
-    const twitterExtra = posColon === -1 ? null : fileNameWithExtra.slice(posColon);
+    const posColon = fileNameWithExtraDecoded.indexOf(":", 1);
+    const fileNameWithoutExtra = posColon === -1 ? fileNameWithExtraDecoded : fileNameWithExtraDecoded.slice(0, posColon);
 
     const path = parts.join("/") + "/";
     const posDot = fileNameWithoutExtra.lastIndexOf(".");
@@ -32,17 +221,17 @@ export function parseFile(filePath: string): ParsedFile {
     if (fileNameWithoutExtra === "" || posDot < 1) {
         return {
             path,
+            pathEnd: fileNameWithExtra,
             baseName: fileNameWithoutExtra,
             extension: null,
-            twitterExtra: null
         };
     }
 
     return {
         path,
+        pathEnd: fileNameWithExtra,
         baseName: fileNameWithoutExtra.slice(0, posDot),
         extension: fileNameWithoutExtra.slice(posDot + 1).toLowerCase(),
-        twitterExtra: twitterExtra ?? null
     };
 }
 
@@ -51,7 +240,15 @@ export function parseFile(filePath: string): ParsedFile {
  */
 export function parseURL(url: string): ParsedURL {
     const parsed = new URL(url);
-    const { path, baseName, extension, twitterExtra } = parseFile(parsed.pathname);
+    const source = getAssetSource(parsed);
+
+    const { path, pathEnd, baseName, extension } =
+        source === AssetSource.UNKNOWN
+            ? { path: "", pathEnd: "", baseName: "", extension: "" }
+            : source === AssetSource.DATA_SVG
+                ? { path: url, pathEnd: "", baseName: "", extension: "svg" }
+                : parseFile(parsed.pathname);
+
     const params = Array.from(parsed.searchParams.entries()).reduce(
         (acc, [key, value]) => {
             if (["ex", "is", "hm"].includes(key)) {
@@ -65,33 +262,14 @@ export function parseURL(url: string): ParsedURL {
     );
 
     return {
-        url: url,
-        host: parsed.origin.toLowerCase(),
+        url: parsed,
         path,
+        pathEnd,
         baseName,
         extension,
         params,
-        twitterExtra
+        source
     };
-}
-
-/**
- * Sanitize a file name by replacing invalid characters with underscores.
- */
-export function sanitizeFilename(filename: string, allowUnicode: boolean, fallback?: string): string {
-    let sanitized = filename.replace(/[<>:"/\\|?*\x00-\x1F]/g, "_") // windows-reserved
-        .replace(/^\./, "_") // dot files
-        .replace(/(\.\.)+/g, "_") // relative paths
-        .replace(/[ \t\n\r]+/g, "_"); // spaces
-
-    if (!allowUnicode) {
-        sanitized = sanitized.replace(/[^\x00-\x7F]/g, "_"); // non-ASCII characters
-    } else {
-        sanitized = sanitized.normalize("NFD"); // normalize unicode
-    }
-
-    sanitized = sanitized.replace(/^_+|_+$/g, ""); // leading and trailing underscores
-    return sanitized || fallback || "";
 }
 
 /**
@@ -109,145 +287,100 @@ export function getFormattedNow(): string {
     }).replace(",", "");
 }
 
-/**
- * Join or create a group in the guild context menu.
- */
-export function joinOrCreateContextMenuGroup(
-    children: Array<any>,
-    items: Array<any>,
-    groupId: string,
-    submenuId?: string,
-    submenuLabel?: string,
-    insertOrder?: InsertGroup[]
-) {
-    function joinOrCreateSubmenu() {
-        const existingItemShouldJoinSubmenu = existingGroup.props.children.find(child => child?.props?.submenuId === submenuId);
-        let existingSubmenu = existingGroup.props.children.find(child => child?.props?.id === submenuId);
-        let numitems = items.length;
+export function parseDiscordURLs(url: ParsedURL, asset: AssetInfo) {
+    const detected = url.url.href.match(ASSET_TYPE_EXTRACTOR);
+    const detectedPrimary = detected?.[1] ?? "";
+    const detectedSecondary = detected?.[2] ?? "";
+    const detectedTertiary = detected?.[3] ?? "";
 
-        if (existingItemShouldJoinSubmenu) {
-            existingSubmenu = null;
-            items.unshift(existingItemShouldJoinSubmenu);
-            numitems++;
-            const indexOfExistingItemShouldJoinSubmenu = existingGroup.props.children.findIndex(child => child === existingItemShouldJoinSubmenu);
-            existingGroup.props.children.splice(indexOfExistingItemShouldJoinSubmenu, 1);
-        }
-
-        if (existingSubmenu) {
-            if (!Array.isArray(existingSubmenu.props.children)) {
-                existingSubmenu.props.children = [existingSubmenu.props.children];
-            }
-
-            items.forEach(member => member.props.label = member.props.submenuItemLabel ?? member.props.label);
-            existingSubmenu.props.children.push(...items);
-        } else if (numitems === 1) {
-            if (!chosenInsertOption?.position || chosenInsertOption.position === "END") {
-                existingGroup.props.children.push(items[0]);
+    if (detectedPrimary === "attachments") {
+        url.url.host = ASSET_MEDIA_PROXY_BASE.host;
+        url.source = AssetSource.ATTACHMENT_MEDIA_PROXY;
+        asset.classifier = asset.mime;
+    } else if (detectedPrimary === "emojis") {
+        url.url.host = ASSET_MEDIA_PROXY_BASE.host;
+        url.source = AssetSource.ASSET_MEDIA_PROXY;
+        asset.classifier = AssetType.CUSTOM_EMOJI;
+    } else if (detectedPrimary === "badge-icons") {
+        url.url.host = ASSET_MEDIA_PROXY_BASE.host;
+        url.source = AssetSource.ASSET_MEDIA_PROXY;
+        asset.classifier = AssetType.PROFILE_BADGE;
+    } else if (detectedPrimary === "clan-badges") {
+        url.url.host = ASSET_MEDIA_PROXY_BASE.host;
+        url.source = AssetSource.ASSET_MEDIA_PROXY;
+        asset.classifier = AssetType.CLAN_BADGE;
+    } else if (detectedPrimary === "role-icons") {
+        url.url.host = ASSET_MEDIA_PROXY_BASE.host;
+        url.source = AssetSource.ASSET_MEDIA_PROXY;
+        asset.classifier = AssetType.CUSTOM_ROLE_ICON;
+    } else if (detectedPrimary === "discovery-splashes") {
+        url.url.host = ASSET_MEDIA_PROXY_BASE.host;
+        url.source = AssetSource.ASSET_MEDIA_PROXY;
+        asset.classifier = AssetType.GUILD_DISCOVERY_SPLASH;
+    } else if (detectedPrimary === "splashes") {
+        url.url.host = ASSET_MEDIA_PROXY_BASE.host;
+        url.source = AssetSource.ASSET_MEDIA_PROXY;
+        asset.classifier = AssetType.GUILD_INVITE_SPLASH;
+    } else if (detectedPrimary === "banners") {
+        url.url.host = ASSET_MEDIA_PROXY_BASE.host;
+        url.source = AssetSource.ASSET_MEDIA_PROXY;
+        asset.classifier = AssetType.GUILD_BANNER;
+    } else if (detectedPrimary === "icons") {
+        url.url.host = ASSET_MEDIA_PROXY_BASE.host;
+        url.source = AssetSource.ASSET_MEDIA_PROXY;
+        asset.classifier = AssetType.GUILD_ICON;
+    } else if (detectedPrimary === "avatar-decoration-presets") {
+        url.url.host = ASSET_MEDIA_PROXY_BASE.host;
+        url.source = AssetSource.ASSET_MEDIA_PROXY;
+        asset.classifier = AssetType.AVATAR_DECORATION;
+        asset.animatable = true; // Avatar decorations always have animated variants.
+    } else if (detectedPrimary === "avatars" || (detectedPrimary === "guilds" && detectedSecondary === "avatars")) {
+        url.url.host = ASSET_MEDIA_PROXY_BASE.host;
+        url.source = AssetSource.ASSET_MEDIA_PROXY;
+        asset.classifier = AssetType.USER_AVATAR;
+    } else if (detectedPrimary === "banners" || (detectedPrimary === "guilds" && detectedSecondary === "banners")) {
+        url.url.host = ASSET_MEDIA_PROXY_BASE.host;
+        url.source = AssetSource.ASSET_MEDIA_PROXY;
+        asset.classifier = AssetType.USER_BANNER;
+    } else if (detectedPrimary === "assets/collectibles/nameplates") {
+        url.url.host = CDN_BASE.host;
+        url.source = AssetSource.CDN;
+        asset.classifier = AssetType.NAMEPLATE;
+        asset.animatable = true; // Nameplates always have animated variants.
+        asset.alias ??= detectedTertiary ?? "nameplate";
+    } else if (detectedPrimary === "assets/profile_effects/effects") {
+        url.url.host = CDN_BASE.host;
+        url.source = AssetSource.CDN;
+        ![AssetType.PROFILE_EFFECT_PRIMARY, AssetType.PROFILE_EFFECT_SECONDARY, AssetType.PROFILE_EFFECT_THUMBNAIL].includes(asset.classifier as any) && (asset.classifier = AssetType.PROFILE_EFFECT_THUMBNAIL);
+        asset.animatable = !(asset.classifier === AssetType.PROFILE_EFFECT_THUMBNAIL);
+        asset.alias ??= detectedTertiary ?? "profile-effect";
+    } else if (detectedPrimary === "stickers") {
+        if (url.extension === "gif") {
+            url.url.host = ASSET_MEDIA_PROXY_BASE.host;
+            url.source = AssetSource.ASSET_MEDIA_PROXY;
+            asset.classifier = AssetType.GIF_STICKER;
+            asset.animatable = true;
+        } else if (url.extension === "webp") {
+            if (asset.animatable) {
+                url.url.host = ASSET_MEDIA_PROXY_BASE.host;
+                url.source = AssetSource.ASSET_MEDIA_PROXY;
+                asset.classifier = AssetType.GIF_STICKER;
             } else {
-                existingGroup.props.children.unshift(items[0]);
+                // There is no way to know if a static WEBP sticker
+                // link is sourced from an APNG, PNG, or GIF sticker.
             }
-        } else {
-            existingSubmenu = (
-                <Menu.MenuItem
-                    id={submenuId as string}
-                    label={submenuLabel}
-                >
-                    {[...items]}
-                </Menu.MenuItem>
-            );
-
-            items.forEach(member => member.props.label = member.props.submenuItemLabel ?? member.props.label);
-
-            if (!chosenInsertOption?.position || chosenInsertOption.position === "END") {
-                existingGroup.props.children.push(existingSubmenu);
+        } else if (url.extension === "png") {
+            if (asset.animatable) {
+                url.url.host = ASSET_MEDIA_PROXY_BASE.host;
+                url.source = AssetSource.ASSET_MEDIA_PROXY;
+                asset.classifier = AssetType.APNG_STICKER;
             } else {
-                existingGroup.props.children.unshift(existingSubmenu);
+                // There is no way to know if a static PNG sticker
+                // link is sourced from an APNG, PNG, or GIF sticker.
             }
+        } else if (url.extension === "jpg") {
+            // There is no way to know if a JPG sticker link
+            // is sourced from an APNG, PNG, or GIF sticker.
         }
-    }
-
-    items.forEach(member => {
-        member.props.groupId = groupId;
-        member.props.submenuId = submenuId;
-        member.props.submenuLabel = submenuLabel;
-    });
-
-    const insertWithOptions = insertOrder?.filter(item => item.type === "WITH_GROUP");
-    let existingGroup = children.find(child => child?.props?.id === groupId);
-    let chosenInsertOption;
-
-    if (!existingGroup && insertWithOptions) {
-        let targetItem;
-
-        for (const item of insertWithOptions) {
-            if (item.id.group) {
-                targetItem = children.find(child => child?.props?.id === item.id.group);
-            }
-
-            if (!targetItem && item.id.child) {
-                targetItem = findGroupChildrenByChildId(item.id.child, children, true);
-            }
-
-            if (targetItem) {
-                existingGroup = children.find(child => child?.props?.children === targetItem);
-                chosenInsertOption = item;
-                break;
-            }
-        }
-    }
-
-    if (existingGroup) {
-        if (!Array.isArray(existingGroup.props.children)) {
-            existingGroup.props.children = [existingGroup.props.children];
-        }
-
-        if (!submenuId) {
-            if (!chosenInsertOption?.position || chosenInsertOption.position === "END") {
-                existingGroup.props.children.push(...items);
-            } else {
-                existingGroup.props.children.unshift(...items);
-            }
-
-            return;
-        } else {
-            joinOrCreateSubmenu();
-        }
-    } else {
-        if (!submenuId) {
-            existingGroup = (
-                <Menu.MenuGroup id={groupId}>
-                    {[...items]}
-                </Menu.MenuGroup>
-            );
-        } else {
-            existingGroup = (<Menu.MenuGroup id={groupId}>{[]}</Menu.MenuGroup>);
-            joinOrCreateSubmenu();
-        }
-
-        const insertAfterBeforeOptions = insertOrder?.filter(item => item.type !== "WITH_GROUP") || [];
-        let targetIndex = children.length;
-        let targetItem;
-
-        for (const item of insertAfterBeforeOptions) {
-            if (item.id.group) {
-                targetItem = children.find(child => child?.props?.id === item.id.group);
-            }
-
-            if (!targetItem && item.id.child) {
-                targetItem = findGroupChildrenByChildId(item.id.child, children, true);
-            }
-
-            if (targetItem) {
-                targetIndex = children.findIndex(child => child?.props?.children === targetItem);
-
-                if (item.type === "AFTER_GROUP") {
-                    targetIndex++;
-                }
-
-                break;
-            }
-        }
-
-        children.splice(targetIndex, 0, existingGroup);
     }
 }
