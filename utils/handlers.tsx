@@ -344,7 +344,7 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
             url,
             mime: (attachment as any).contentType || null,
             size: attachment.size,
-            title: (attachment as any).title || null,
+            title: (attachment as any).title || (attachment as any).filename || null,
             animated: !!(((attachment as any).flags ?? 0) & AttachmentFlags.IS_ANIMATED),
         };
     }));
@@ -416,7 +416,11 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
     const targetedAttachment = (attachmentData.find(attachment => {
         const attachmentURLParsed = new URL(attachment.url);
         const attachmentURL = `${attachmentURLParsed.origin}${attachmentURLParsed.pathname}`;
-        return attachmentURL === props.mediaItem?.url || attachmentURL === props.mediaItem?.proxyUrl || attachmentURL === targetSRC || attachmentURL === targetProxy;
+        const mediaItemURLParsed = !props.mediaItem?.url ? null : new URL(props.mediaItem?.url);
+        const mediaItemURL = mediaItemURLParsed ? `${mediaItemURLParsed.origin}${mediaItemURLParsed.pathname}` : "";
+        const mediaItemProxyParsed = !props.mediaItem?.proxyUrl ? null : new URL(props.mediaItem?.proxyUrl);
+        const mediaItemProxyURL = mediaItemProxyParsed ? `${mediaItemProxyParsed.origin}${mediaItemProxyParsed.pathname}` : "";
+        return attachmentURL === mediaItemURL || attachmentURL === mediaItemProxyURL || attachmentURL === targetSRC || attachmentURL === targetProxy;
     })) || null;
 
     // Discord does not pass invite data to the context menu, so querying for
