@@ -576,7 +576,7 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
             submenuItemLabel={`${isTargeted ? "Targeted Attachment" : (attachment.title || `Attachment ${(index ?? 0) + 1}`)}`}
             icon={() => ImageIcon({ width: 20, height: 20 })}
             action={async () => await handleDownload({
-                alias: attachment.title ? sanitizeFilename(attachment.title, {}) : null,
+                alias: attachment.title ? sanitizeFilename(attachment.title, { splitExtension: true }) : null,
                 animatable: attachment.animated,
                 urls: { primary: attachment.url },
                 mime: attachment.mime,
