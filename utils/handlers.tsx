@@ -83,16 +83,16 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
                 const parsedVideoURLIsTrusted = parsedVideoURL?.source && parsedVideoURL.source !== AssetSource.UNKNOWN;
 
                 data["videos"] = [{
-                    video: (parsedVideoURLIsTrusted ? embed.video.url : embed.video.proxyURL) || null,
+                    video: parsedVideoURLIsTrusted ? embed.video.url : embed.video.proxyURL || null,
                     videoExternal: embed.video.url || null,
                     videoProxy: embed.video.proxyURL || null,
                     videoMime: (embed.video as any)?.contentType || null
-                }];
+                }].filter(v => v.video);
             } else {
                 data["videos"] = [];
             }
 
-            if (!tenor && data["videos"].length === 0 && embed.thumbnail) {
+            if (!tenor && data["videos"]?.length === 0 && embed.thumbnail) {
                 const parsedThumbnailURL = parseURL(embed.thumbnail.url);
                 const parsedThumbnailURLIsTrusted = parsedThumbnailURL?.source && parsedThumbnailURL.source !== AssetSource.UNKNOWN;
                 const thumbnailURL = (parsedThumbnailURLIsTrusted ? embed.thumbnail.url : embed.thumbnail.proxyURL) || null;
@@ -115,7 +115,7 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
                     imageProxy: embed.image.proxyURL || null,
                     imageAnimated: (embed.image as any)?.srcIsAnimated ?? null,
                     imageMime: (embed.image as any)?.contentType || null
-                }];
+                }].filter(img => img.image);
             } else {
                 data["images"] = [];
             }
@@ -178,7 +178,7 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
                     videoExternal: embed.video.url || null,
                     videoProxy: embed.video.proxyURL || null,
                     videoMime: (embed.video as any)?.contentType || null
-                }];
+                }].filter(v => v.video);
             } else {
                 data["videos"] = [];
             }
@@ -385,19 +385,18 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
     const targetedEmbedMedia = embedData.reduce<{ primary?: string | null; secondary?: string | null; mime?: string | null; target?: string; } | null>((result, data) => {
         if (result) return result;
 
-        const image = data.images?.find(img => img.imageProxy === targetProxy || img.imageProxy === targetSRC || img.imageExternal === targetSRC || img.imageExternal === targetProxy) || null;
-        if (image) return { primary: image.imageProxy, secondary: image.image, mime: image.imageMime, target: "Image" };
+        const image = data.images?.find(img => img.imageProxy === targetProxy || img.imageProxy === targetSRC || img.imageExternal === targetSRC || img.imageExternal === targetProxy) || "";
+        if (image) return { primary: image.image, mime: image.imageMime, target: "Image" };
 
-        if (data.authorProxy === targetProxy || data.authorProxy === targetSRC || data.authorExternal === targetSRC || data.authorExternal === targetProxy) return { primary: data.authorProxy, secondary: data.author, mime: data.authorMime, target: "Author Icon" };
-        if (data.footerProxy === targetProxy || data.footerProxy === targetSRC || data.footerExternal === targetSRC || data.footerExternal === targetProxy) return { primary: data.footerProxy, secondary: data.footer, mime: data.footerMime, target: "Footer Icon" };
-        if (data.thumbnailProxy === targetProxy || data.thumbnailProxy === targetSRC || data.thumbnailExternal === targetSRC || data.thumbnailExternal === targetProxy) return { primary: data.thumbnailProxy, secondary: data.thumbnail, mime: data.thumbnailMime, target: "Thumbnail" };
-
+        if (data.authorProxy === targetProxy || data.authorProxy === targetSRC || data.authorExternal === targetSRC || data.authorExternal === targetProxy) return { primary: data.author, mime: data.authorMime, target: "Author Icon" };
+        if (data.footerProxy === targetProxy || data.footerProxy === targetSRC || data.footerExternal === targetSRC || data.footerExternal === targetProxy) return { primary: data.footer, mime: data.footerMime, target: "Footer Icon" };
+        if (data.thumbnailProxy === targetProxy || data.thumbnailProxy === targetSRC || data.thumbnailExternal === targetSRC || data.thumbnailExternal === targetProxy) return { primary: data.thumbnail, mime: data.thumbnailMime, target: "Thumbnail" };
         // Discord does not always pass video data to the context menu
         // for embedded videos, so querying for the element is necessary.
         const videoElement = targetElement?.closest("[class*=embedVideo]")?.querySelector("video");
-        const videoSrc = videoElement?.src || null;
+        const videoSrc = videoElement?.src || "";
         let video = data.videos?.find(v => v.videoProxy === videoSrc || v.videoExternal === videoSrc || v.videoProxy === targetProxy || v.videoProxy === targetSRC || v.videoExternal === targetSRC || v.videoExternal === targetProxy) || null;
-        if (video) return { primary: video.videoProxy, secondary: video.video, mime: video.videoMime, target: (data.type === "VIDEO" || (data.type === "RICH" && videoSrc)) ? "Video" : "Tenor GIF" };
+        if (video) return { primary: video.video, mime: video.videoMime, target: (data.type === "VIDEO" || (data.type === "RICH" && videoSrc)) ? "Video" : "Tenor GIF" };
 
         return null;
     }, null);
@@ -405,11 +404,11 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
     const targetedComponentMedia = componentData.reduce<{ primary?: string | null; secondary?: string | null; mime?: string | null; target?: string; } | null>((result, component) => {
         if (result) return result;
 
-        const thumbnail = component.items.find(item => item.type === "THUMBNAIL" && (item.thumbnailProxy === targetProxy || item.thumbnailProxy === targetSRC || item.thumbnailExternal === targetSRC || item.thumbnailExternal === targetProxy)) || null;
-        if (thumbnail) return { primary: thumbnail.thumbnailProxy, secondary: thumbnail.thumbnail, mime: thumbnail.thumbnailMime, target: "Thumbnail" };
+        const thumbnail = component.items.find(item => item.type === "THUMBNAIL" && (item.thumbnailProxy === targetProxy || item.thumbnailProxy === targetSRC || item.thumbnailExternal === targetSRC || item.thumbnailExternal === targetProxy)) || "";
+        if (thumbnail) return { primary: thumbnail.thumbnail, mime: thumbnail.thumbnailMime, target: "Thumbnail" };
 
-        const media = component.items.find(item => item.type === "MEDIA" && (item.mediaProxy === targetProxy || item.mediaProxy === targetSRC || item.mediaExternal === targetSRC || item.mediaExternal === targetProxy)) || null;
-        if (media) return { primary: media.mediaProxy, secondary: media.media, mime: media.mediaMime, target: "Media" };
+        const media = component.items.find(item => item.type === "MEDIA" && (item.mediaProxy === targetProxy || item.mediaProxy === targetSRC || item.mediaExternal === targetSRC || item.mediaExternal === targetProxy)) || "";
+        if (media) return { primary: media.media, mime: media.mediaMime, target: "Media" };
 
         return null;
     }, null);
@@ -771,15 +770,6 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
         const targetedInviteMenu = getInviteMenuItem(targetedInvite, true);
         targetedInviteMenu && downloadifyItems.push(...[targetedInviteMenu, targetedSeparator]);
     }
-
-    DownloadifyLogger.info(
-        allEmojis,
-        message.stickerItems,
-        inviteData,
-        embedData,
-        componentData,
-        attachmentData
-    );
 
     if (!!allEmojis.unicode.length || !!allEmojis.custom.length) {
         const onlyHasUnicodeEmojis = !!allEmojis.unicode.length && !allEmojis.custom.length;
