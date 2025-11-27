@@ -154,14 +154,12 @@ export default definePlugin({
             group: true,
             replacement: [
                 {
-                    // Custom Emojis.
                     match: /(?="data-type")/,
                     replace: "onContextMenu:(event)=>{$self.EmojiProfileContextMenu(event,arguments[0])},"
                 },
                 {
-                    // Unicode Emojis.
                     match: /(?=draggable)/,
-                    replace: "onContextMenu:(event)=>{console.log(arguments);console.log(t);$self.EmojiProfileContextMenu(event,arguments[0])},"
+                    replace: "onContextMenu:(event)=>{$self.EmojiProfileContextMenu(event,arguments[0])},"
                 }
             ]
         },
