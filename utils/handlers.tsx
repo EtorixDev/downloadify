@@ -21,7 +21,6 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
         return;
     }
 
-    DownloadifyLogger.info("\n\n\n");
     DownloadifyLogger.info(`[${getFormattedNow()}] [MESSAGE CONTEXT MENU OPENED]\n`, props);
 
     const mainMessage = props.message;
@@ -378,7 +377,8 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
     )) || null;
 
     const targetElement = props.contextMenuAPIArguments?.[0].target as HTMLElement | null;
-    const targetSRC = props.itemSrc ?? "";
+    const targetSRCParsed = !props.itemSrc ? null : new URL(props.itemSrc);
+    const targetSRC = targetSRCParsed ? `${targetSRCParsed?.origin}${targetSRCParsed?.pathname}` : "";
     const targetProxyParsed = !props.itemSafeSrc ? null : new URL(props.itemSafeSrc);
     const targetProxy = targetProxyParsed ? `${targetProxyParsed?.origin}${targetProxyParsed?.pathname}` : "";
 
@@ -413,7 +413,11 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
         return null;
     }, null);
 
-    const targetedAttachment = (props.mediaItem && (attachmentData.find(attachment => attachment.url === props.mediaItem?.url || attachment.url === props.mediaItem?.proxyUrl))) || null;
+    const targetedAttachment = (attachmentData.find(attachment => {
+        const attachmentURLParsed = new URL(attachment.url);
+        const attachmentURL = `${attachmentURLParsed.origin}${attachmentURLParsed.pathname}`;
+        return attachmentURL === props.mediaItem?.url || attachmentURL === props.mediaItem?.proxyUrl || attachmentURL === targetSRC || attachmentURL === targetProxy;
+    })) || null;
 
     // Discord does not pass invite data to the context menu, so querying for
     // the element is necessary to detect if it was the target of the context menu.
