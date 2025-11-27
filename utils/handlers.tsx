@@ -440,6 +440,7 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
             (targetedInviteElementMembers && invite.profile?.member_count === Number(targetedInviteElementMembers.replace(/\D/g, '')));
     })) || null;
 
+    const anyTargetedItem = !!(targetedEmoji || targetedSticker || targetedEmbedMedia || targetedComponentMedia || targetedAttachment || targetedInvite);
     const downloadifyItems: any[] = [];
 
     function getEmojiMenuItem(emoji: ExtractedEmoji, isTargeted: boolean = false, isSubmenuItem: boolean = false) {
@@ -972,6 +973,10 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
                 {attachmentData.map((attachment, index) => getAttachmentMenuItem(attachment, false, index))}
             </Menu.MenuItem>
         );
+    }
+
+    if (anyTargetedItem && downloadifyItems.length === 3) {
+        downloadifyItems.splice(-2);
     }
 
     if (!downloadifyItems.length) {
