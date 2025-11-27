@@ -13,3 +13,10 @@ Available natively in [Equicord](https://github.com/Equicord/Equicord), a Vencor
 3. Add a download button to voice messages.
 4. Set a default directory or pick each time.
     - Pick whether to overwrite existing files or not.
+
+## TODO
+A few things not yet implemented.
+1. Game Collection / Profile Widget / Profile Board.
+2. Status emojis as part of the `user-context` menu instead of just on their own.
+3. Current activity assets, both on their own and as part of the `user-context` menu.
+4. Various SVGs, AutoMod icon, profile icons, etc.
