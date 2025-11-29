@@ -975,7 +975,7 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
         );
     }
 
-    if (anyTargetedItem && downloadifyItems.length === 3) {
+    if (anyTargetedItem && downloadifyItems.length === 3 && ((downloadifyItems[2].props?.children?.length ?? 0) <= 1)) {
         downloadifyItems.splice(-2);
     }
 
