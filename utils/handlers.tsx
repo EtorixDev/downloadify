@@ -568,7 +568,7 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
 
     function getAttachmentMenuItem(attachment: { url: string; mime: string | null; size: number; title: string | null; animated: boolean; }, isTargeted: boolean = false, index?: number) {
         const key = isTargeted ? "targeted-attachment" : `attachment-${index ?? 0}`;
-        const label = isTargeted ? "Download Attachment" : (attachment.title || `Attachment ${(index ?? 0) + 1}`);
+        const label = isTargeted ? `Download ${attachment.title || "Attachment"}` : (attachment.title || `Attachment ${(index ?? 0) + 1}`);
 
         return <Menu.MenuItem
             key={`downloadify-${key}`}
