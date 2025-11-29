@@ -118,8 +118,8 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
             } else {
                 data["images"] = [];
             }
-        } else if (embed.type === "rich" || embed.type === "article") {
-            data["type"] = "RICH";
+        } else if (["rich", "article", "link"].includes(embed.type)) {
+            data["type"] = "BLOCK";
             data["emojis"] = extractEmojis(JSON.stringify(embed));
 
             if (embed.author?.iconURL) {
@@ -187,7 +187,7 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
 
         return { ...data };
     }).filter(Boolean) as Array<{
-        type: "TENOR" | "VIDEO" | "IMAGE" | "RICH";
+        type: "TENOR" | "VIDEO" | "IMAGE" | "BLOCK";
         emojis?: { unicode: Array<any>, custom: Array<any>; },
         videos?: {
             video?: string;
@@ -396,7 +396,7 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
         const videoElement = targetElement?.closest("[class*=embedVideo]")?.querySelector("video");
         const videoSrc = videoElement?.src || "";
         let video = data.videos?.find(v => v.videoProxy === videoSrc || v.videoExternal === videoSrc || v.videoProxy === targetProxy || v.videoProxy === targetSRC || v.videoExternal === targetSRC || v.videoExternal === targetProxy) || null;
-        if (video) return { primary: video.video, mime: video.videoMime, target: (data.type === "VIDEO" || (data.type === "RICH" && videoSrc)) ? "Video" : "Tenor GIF" };
+        if (video) return { primary: video.video, mime: video.videoMime, target: (data.type === "VIDEO" || (data.type === "BLOCK" && videoSrc)) ? "Video" : "Tenor GIF" };
 
         return null;
     }, null);
@@ -874,7 +874,7 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
                     const label = hasMultipleImages ? `Image ${imgIdx + 1}` : "Image";
                     embedSpecificItems.push(getEmbedMediaMenuItem(image.image!, image.imageMime, label, false, itemIndex++));
                 });
-            } else if (embed.type === "RICH") {
+            } else if (embed.type === "BLOCK") {
                 const hasMultipleImages = (embed.images?.length ?? 0) > 1;
                 embed.images?.forEach((image, imgIdx) => {
                     const label = hasMultipleImages ? `Image ${imgIdx + 1}` : "Image";
