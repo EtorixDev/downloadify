@@ -109,11 +109,6 @@ export const settings = definePluginSettings({
         type: OptionType.BOOLEAN,
         default: true,
     },
-    overwriteFiles: {
-        description: "If a default directory is set and a download file name matches an existing file, overwrite the file. If disabled, a number will be appended to the file name.",
-        type: OptionType.BOOLEAN,
-        default: false,
-    },
     defaultDirectory: {
         component: DefaultDirectorySetting,
         type: OptionType.COMPONENT,

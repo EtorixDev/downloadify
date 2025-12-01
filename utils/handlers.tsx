@@ -3196,7 +3196,6 @@ async function handleDownload(asset: AssetInfo): Promise<void> {
 
     const result = await DownloadifyNative.download(
         asset,
-        settings.store.overwriteFiles,
         settings.store.allowUnicode
     );
 

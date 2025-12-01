@@ -200,7 +200,6 @@ function buildDiscordURL(
 export async function download(
     _: Electron.IpcMainInvokeEvent,
     asset: AssetInfo,
-    overwriteFiles: boolean,
     allowUnicode: boolean,
 ): Promise<DownloadResponse> {
     const parsedPrimaryURL = parseURL(asset.urls.primary);
@@ -334,10 +333,8 @@ export async function download(
             builtPath = `${defaultDirectory}${path.sep}${baseName}${primaryExtension ? `.${primaryExtension}` : ""}`;
         }
 
-        if (!overwriteFiles) {
-            for (let num = 1; await fileExists(builtPath); num++) {
-                builtPath = `${defaultDirectory}${path.sep}${baseName}-${num}${primaryExtension ? `.${primaryExtension}` : ""}`;
-            }
+        for (let num = 1; await fileExists(builtPath); num++) {
+            builtPath = `${defaultDirectory}${path.sep}${baseName}-${num}${primaryExtension ? `.${primaryExtension}` : ""}`;
         }
     } else {
         const extensions = Object.keys(urls.if);
