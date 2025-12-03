@@ -151,7 +151,7 @@ function buildDiscordURL(
                 newURL.searchParams.append("passthrough", "false");
             }
 
-            if (ext === "webp") {
+            if (["webp", "awebp"].includes(ext)) {
                 newURL.searchParams.append("lossless", "true");
             }
 

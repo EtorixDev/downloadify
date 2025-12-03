@@ -16,7 +16,7 @@ import { Collectible, CollectibleType, CUSTOM_EMOJI_EXTRACTOR, DefaultAssets, Ex
 import { getFormattedNow, sanitizeCollectible } from "./misc";
 
 export const d = classNameFactory("downloadify-");
-export const DownloadifyNative = VencordNative.pluginHelpers.DownloadifyUserPlugin as PluginNative<typeof import("../native")>;
+export const DownloadifyNative = VencordNative.pluginHelpers.Downloadify as PluginNative<typeof import("../native")>;
 export const defaultAssets = findByPropsLazy("DEFAULT_GROUP_DM_AVATARS") as DefaultAssets;
 export const DownloadifyLogger = new Logger("Downloadify");
 export const emojiData = findLazy(m => m.emojis && Array.isArray(m.emojis));
