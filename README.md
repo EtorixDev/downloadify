@@ -21,3 +21,4 @@ A few things not yet implemented.
 3. Current activity assets, both on their own and as part of the `user-context` menu.
 4. Various SVGs, AutoMod icon, profile icons, etc.
 5. Improve default file names across handlers.
+6. Game-Shops such as: https://canary.discord.com/channels/1193841000108531764/game-shop

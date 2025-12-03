@@ -110,6 +110,7 @@ function buildDiscordURL(
     const extensions: string[] = availableExtensions?.[((asset.animatable || onlyAnimated) && !onlyStatic) ? "animated" : "static"] ?? [];
 
     extensions.forEach(ext => {
+        const isVideo = ["video/mp4", "video/webm"].includes(asset.mime ?? "");
         const resolvedExt = ext.replace("apng", "png").replace("awebp", "webp");
         let baseURL: string | undefined;
 
@@ -181,7 +182,7 @@ function buildDiscordURL(
                 baseURL = url.url.href;
             } else if (asset.classifier === AssetType.LOTTIE_STICKER) {
                 baseURL = url.url.href;
-            } else if (asset.classifier === AssetType.GENERIC_STATIC) {
+            } else if (isVideo || asset.classifier === AssetType.GENERIC_STATIC) {
                 const newURL = new URL(url.url.href);
 
                 if (url.extension !== ext) {

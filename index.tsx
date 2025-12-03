@@ -61,11 +61,19 @@ export default definePlugin({
             }
         },
         {
+            // Adds a context menu to the shop featured category banner.
+            find: "REWARD_HERO,categoryStoreListingId",
+            replacement: {
+                match: /(?<=,heroBlock:(\i).{0,500}?heroBlock,)/,
+                replace: "onContextMenu:(event)=>{$self.ShopCategoryHeaderContextMenu(event,$self.CollectiblesCategoryStore.getCategory($1.categorySkuId))},"
+            }
+        },
+        {
             // Adds a context menu to the shop featured category hero headers.
             find: 'location:"HeroBlock"',
             replacement: {
-                match: /(?<=,\i=(\i)=>{var \i;.{0,3000}?heroBlock,)/,
-                replace: "onContextMenu:(event)=>{$self.ShopCategoryHeaderContextMenu(event,$self.CollectiblesCategoryStore.getCategory($1.heroBlock?.categorySkuId))},"
+                match: /(?<=,heroBlock:(\i).{0,3000}?heroBlock,)/,
+                replace: "onContextMenu:(event)=>{$self.ShopCategoryHeaderContextMenu(event,$self.CollectiblesCategoryStore.getCategory($1.categorySkuId))},"
             }
         },
         {

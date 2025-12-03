@@ -186,7 +186,9 @@ export const assetAvailability = {
         [AssetType.PROFILE_EFFECT_SECONDARY]: { animated: ["apng", "png", "webp", "jpg"] },
         [AssetType.PROFILE_EFFECT_THUMBNAIL]: { static: ["png", "webp", "jpg"] },
         [AssetType.LOTTIE_STICKER]: { animated: ["json"] },
-        [AssetType.GENERIC_STATIC]: { static: ["png", "webp", "jpg"] }
+        [AssetType.GENERIC_STATIC]: { static: ["png", "webp", "jpg"] },
+        "video/mp4": { animated: ["mp4", "png", "webp", "jpg"] },
+        "video/webm": { animated: ["webm", "png", "webp", "jpg"] },
     },
     [AssetSource.EXTERNAL_IMAGE_PROXY]: {
         "image/png": { static: ["png", "webp", "jpg"], animated: ["apng", "png", "webp", "jpg"] },
