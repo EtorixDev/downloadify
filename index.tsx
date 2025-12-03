@@ -60,8 +60,16 @@ export default definePlugin({
                 replace: "onContextMenu:(event)=>{$self.ShopListingContextMenu(event,arguments[0].product,arguments[0].cardRef?.current)},$1"
             }
         },
+        // Adds context menus to the shop wide promo banners.
         {
-            // Adds a context menu to the shop featured category banner.
+            find: "let{wideBannerBlock:",
+            replacement: {
+                match: /(?<=let{wideBannerBlock:(\i).{0,15000}?)(ref:\i,className)/,
+                replace: "onContextMenu:(event)=>{$self.ShopCategoryHeaderContextMenu(event,{name:$1.title,heroBannerAsset:{static:$1.bannerURL,animated:$1.bannerAnimatedURL},heroLogoUrl:$1.logoURL})},$2"
+            },
+        },
+        {
+            // Adds a context menu to the shop featured category banners.
             find: "REWARD_HERO,categoryStoreListingId",
             replacement: {
                 match: /(?<=,heroBlock:(\i).{0,500}?heroBlock,)/,
