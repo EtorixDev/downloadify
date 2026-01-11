@@ -14,14 +14,14 @@ Available natively in [Equicord](https://github.com/Equicord/Equicord), a Vencor
 
 ## TODO
 A few things not yet implemented.
-1. Game Collection / Profile Widget / Profile Board.
-2. ~~Status emojis as part of the `user-context` menu instead of just on their own.~~
-3. Current activity assets, both on their own and as part of the `user-context` menu.
-4. Various SVGs, AutoMod icon, profile icons, new user icon, shop wishlist heart etc.
+#### High Priority
+1. Current activity assets, both on their own and as part of the `user-context` menu.
+2. Various SVGs, AutoMod icon, profile icons, new user icon, shop wishlist heart etc.
+3. Claimed Quests context menu.
+#### Low Priority
+4. Game Collection / Profile Widget / Profile Board.
 5. Improve default file names across handlers.
 6. Shop Extras:
     - Game-Shops such as: https://canary.discord.com/channels/1193841000108531764/game-shop
     - Nitro orbs exclusive
-7. ~~Non-store quest rewards in quest context menu.~~
-8. Claimed Quests context menu.
-9. Sponsored Quest banner.
+7. Sponsored Quest banner.

@@ -60,8 +60,8 @@ export default definePlugin({
                 replace: "onContextMenu:(event)=>{$self.ShopListingContextMenu(event,arguments[0].product,arguments[0].cardRef?.current)},$1"
             }
         },
-        // Adds context menus to the shop wide promo banners.
         {
+            // Adds context menus to the shop wide promo banners.
             find: "let{wideBannerBlock:",
             replacement: {
                 match: /(?<=let{wideBannerBlock:(\i).{0,15000}?)(ref:\i,className)/,
