@@ -68,7 +68,6 @@
     background-color: var(--background-base-lower);
     overflow-wrap: break-word;
     font-family: monospace;
-    word-wrap: break-word;
     white-space: pre-wrap;
     border-radius: 4px;
     user-select: text;

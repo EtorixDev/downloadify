@@ -30,8 +30,11 @@ export const TENOR_AWEBP_ID = "Ax";
 export const ASSET_TYPE_EXTRACTOR = new RegExp(/^https:\/\/(?:cdn\.discordapp\.com|media.discordapp.net)\/([a-z-_]+(?:\/[a-z-_]{2,}){0,2})(?:(?:\/\d+\/[a-z-_]+\/\d+\/([a-z-_]+))|(?:\/([a-z-_]+(?:\/[a-z-_]+)?)))?/i);
 // https://regex101.com/library/Y1UQsG
 export const UNICODE_EMOJI_EXTRACTOR = new RegExp(/((?![\u{23}-\u1F6F3]([^\u{FE0F}]|$))\p{Emoji}(?:(?!\u{200D})\p{EComp}|(?=\u{200D})\u{200D}\p{Emoji})*)/gmu);
-export const UNRESOLVED_UNICODE_EMOJI_EXTRACTOR = new RegExp(/:([a-zA-Z0-9_\-\+]+):/gmu);
+export const UNRESOLVED_UNICODE_EMOJI_EXTRACTOR = new RegExp(/:([a-zA-Z0-9_\-+]+):/gmu);
 export const CUSTOM_EMOJI_EXTRACTOR = new RegExp(/<(?<animated>a)?:(?<name>\w{1,32}):(?<id>\d{17,20})>/gmu);
+export const ORBS_SKU_ID = "1287881739531976815";
+export const ORBS_REWARD_WEBM = "https://cdn.discordapp.com/assets/content/fb761d9c206f93cd8c4e7301798abe3f623039a4054f2e7accd019e1bb059fc8.webm";
+export const ORBS_REWARD_PNG = `${ORBS_REWARD_WEBM}?format=png`;
 
 export interface ExtractedCustomEmoji {
     animated: boolean;
@@ -100,6 +103,7 @@ export enum AssetType {
     GIF_STICKER = "gif_sticker",
     LOTTIE_STICKER = "lottie_sticker",
     GENERIC_STATIC = "generic_static",
+    GENERIC_WEBM = "generic_webm",
     DATA_SVG = "data_svg"
 }
 
@@ -187,8 +191,10 @@ export const assetAvailability = {
         [AssetType.PROFILE_EFFECT_THUMBNAIL]: { static: ["png", "webp", "jpg"] },
         [AssetType.LOTTIE_STICKER]: { animated: ["json"] },
         [AssetType.GENERIC_STATIC]: { static: ["png", "webp", "jpg"] },
+        [AssetType.GENERIC_WEBM]: { animated: ["webm", "png", "webp", "jpg"] },
         "video/mp4": { animated: ["mp4", "png", "webp", "jpg"] },
         "video/webm": { animated: ["webm", "png", "webp", "jpg"] },
+        "video/quicktime": { animated: ["mov", "png", "webp", "jpg"] },
     },
     [AssetSource.EXTERNAL_IMAGE_PROXY]: {
         "image/png": { static: ["png", "webp", "jpg"], animated: ["apng", "png", "webp", "jpg"] },
@@ -198,6 +204,7 @@ export const assetAvailability = {
         "image/gif": { animated: ["gif", "awebp", "png", "webp", "jpg"] },
         "video/mp4": { animated: ["mp4", "png", "webp", "jpg"] },
         "video/webm": { animated: ["webm", "png", "webp", "jpg"] },
+        "video/quicktime": { animated: ["mov", "png", "webp", "jpg"] },
     },
     [AssetSource.ATTACHMENT_MEDIA_PROXY]: {
         "image/png": { static: ["png", "webp", "jpg"], animated: ["apng", "png", "webp", "jpg"] },
@@ -207,6 +214,7 @@ export const assetAvailability = {
         "image/gif": { animated: ["gif", "awebp", "png", "webp", "jpg"] },
         "video/mp4": { animated: ["mp4", "png", "webp", "jpg"] },
         "video/webm": { animated: ["webm", "png", "webp", "jpg"] },
+        "video/quicktime": { animated: ["mov", "png", "webp", "jpg"] },
         [AssetType.VOICE_MESSAGE]: { audio: ["ogg"] }
     },
     [AssetSource.ASSET_MEDIA_PROXY]: {
@@ -358,6 +366,10 @@ export interface Quest {
         rewardsConfig: {
             rewards: {
                 skuId?: string;
+                asset?: string;
+                messages: {
+                    name: string;
+                };
             }[];
         },
         videoMetadata?: {
@@ -522,8 +534,8 @@ export interface EmojiContextMenuProps {
     src?: string,
 }
 
-export interface DownloadifyUser extends User {
-    primaryGuild?: null | {
+export interface DownloadifyUser extends Omit<User, "avatarDecorationData" | "collectibles" | "primaryGuild"> {
+    primaryGuild: null | {
         badge: null | string;
         identityGuildId: null | string;
         tag: null | string;
@@ -544,7 +556,7 @@ export interface DownloadifyUser extends User {
     }>;
 }
 
-export interface DownloadifyMember extends Omit<GuildMember, "avatarDecoration" | "iconRoleId"> {
+export interface DownloadifyMember extends Omit<GuildMember, "avatarDecoration" | "collectibles" | "iconRoleId"> {
     iconRoleId?: string;
     profileEffect?: null | {
         skuId: string;

@@ -6,15 +6,82 @@
 
 import { ImageIcon } from "@components/index";
 import { copyWithToast } from "@utils/index";
-import { ConnectedAccount, GuildSticker, Sticker } from "@vencord/discord-types";
+import { ConnectedAccount } from "@vencord/discord-types";
 import { StickerFormatType } from "@vencord/discord-types/enums";
-import { ContextMenuApi, GuildMemberStore, GuildRoleStore, GuildStore, Menu, SelectedGuildStore, showToast, StickersStore, Toasts, UserProfileStore, UserStore } from "@webpack/common";
+import { ContextMenuApi, GuildMemberStore, GuildRoleStore, GuildStore, Menu, PresenceStore, SelectedGuildStore, showToast, StickersStore, Toasts, UserProfileStore, UserStore } from "@webpack/common";
 import { JSX } from "react";
 
 import { settings } from "../settings";
-import { ASSET_MEDIA_PROXY_BASE, AssetInfo, AssetSource, AssetType, AttachmentFlags, AvatarDecoration, BadgeNames, CDN_BASE, ChannelContextMenuProps, ClanBadgeMessageContextMenuProps, CollectibleType, ConnectionExtrasProfileContextMenuProps, ConnectionIconProfileContextMenuProps, DownloadifyMember, DownloadifyUser, DownloadifyUserProfile, EmojiContextMenuProps, ExpandedModalDownloadProps, ExtractedCustomEmoji, ExtractedEmoji, ExtractedEmojis, GDMContextMenuProps, GuildContextMenuProps, HoverDownloadProps, InviteData, MessageContextMenuProps, Nameplate, OrbsPopoutShopImageContextMenuProps, PRIMARY_DOMAIN_BASE, ProfileBadgeContextMenuProps, ProfileEffect, QuestTileContextMenuProps, RoleIconMessageContextMenuProps, RoleIconProfileContextMenuProps, ShopCategoryHeaderContextMenuProps, ShopListingContextMenuProps, UnicodeEmojiData, UserContextMenuProps, VoiceMessageDownloadButtonProps } from "./definitions";
+import { ASSET_MEDIA_PROXY_BASE, AssetInfo, AssetSource, AssetType, AttachmentFlags, AvatarDecoration, BadgeNames, CDN_BASE, ChannelContextMenuProps, ClanBadgeMessageContextMenuProps, CollectibleType, ConnectionExtrasProfileContextMenuProps, ConnectionIconProfileContextMenuProps, DownloadifyMember, DownloadifyUser, DownloadifyUserProfile, EmojiContextMenuProps, ExpandedModalDownloadProps, ExtractedEmoji, ExtractedEmojis, GDMContextMenuProps, GuildContextMenuProps, HoverDownloadProps, InviteData, MessageContextMenuProps, Nameplate, ORBS_REWARD_PNG, ORBS_REWARD_WEBM, ORBS_SKU_ID, OrbsPopoutShopImageContextMenuProps, PRIMARY_DOMAIN_BASE, ProfileBadgeContextMenuProps, ProfileEffect, QuestTileContextMenuProps, RoleIconMessageContextMenuProps, RoleIconProfileContextMenuProps, ShopCategoryHeaderContextMenuProps, ShopListingContextMenuProps, UserContextMenuProps, VoiceMessageDownloadButtonProps } from "./definitions";
 import { fileThreshold, getFormattedNow, parseURL, sanitizeFilename, SVG2URL } from "./misc";
 import { ApplicationStore, CollectiblesData, d, defaultAssets, DownloadIcon, DownloadifyLogger, DownloadifyNative, extractEmojis, getConnection, getUnicodeEmojiData, getUnicodeEmojiPath, ImageAsIcon, InviteStore, joinOrCreateContextMenuGroup } from "./nonative";
+
+function getEmojiMenuItem(emoji: ExtractedEmoji, isTargeted: boolean = false, isSubmenuItem: boolean = false) {
+    const isUnicodeEmoji = !(emoji as any).id;
+    const isCustomEmoji = !isUnicodeEmoji;
+    const isAnimated = isUnicodeEmoji ? false : (emoji as any).animated;
+    const emojiURL = isCustomEmoji
+        ? `${ASSET_MEDIA_PROXY_BASE.origin}/emojis/${(emoji as any).id}.${isAnimated ? "gif" : "png"}`
+        : `${PRIMARY_DOMAIN_BASE.origin}${(emoji as any).path}`;
+
+    return <Menu.MenuItem
+        key={`downloadify-${isTargeted ? "targeted-" : ""}${sanitizeFilename(emoji.name, {})}-emoji`}
+        id={`downloadify-${isTargeted ? "targeted-" : ""}${sanitizeFilename(emoji.name, {})}-emoji`}
+        label={`${isSubmenuItem ? "" : "Download "}:${emoji.name}:`}
+        submenuItemLabel={`${isTargeted ? "Targeted Emoji " : ""}:${emoji.name}:`}
+        icon={() => ImageAsIcon({ src: emojiURL, width: 20, height: 20 })}
+        action={async () => await handleDownload({
+            alias: `${sanitizeFilename(emoji.name, {})}-emoji`,
+            animatable: false,
+            urls: { primary: emojiURL },
+            mime: isUnicodeEmoji ? "image/svg+xml" : !isAnimated ? "image/png" : "image/gif",
+            classifier: isCustomEmoji ? AssetType.CUSTOM_EMOJI : AssetType.UNICODE_EMOJI,
+            size: null
+        })}
+    />;
+}
+
+function getEmojiSubmenu(emojis: ExtractedEmojis, keyPrefix: string, includeDownloadPrefix: boolean = false, outerLabelOverride: string | null = null): JSX.Element | null {
+    if (emojis.unicode.length === 0 && emojis.custom.length === 0) {
+        return null;
+    }
+
+    const onlyHasUnicodeEmojis = emojis.unicode.length > 0 && emojis.custom.length === 0;
+    const onlyHasCustomEmojis = emojis.unicode.length === 0 && emojis.custom.length > 0;
+    const hasBothEmojiTypes = emojis.unicode.length > 0 && emojis.custom.length > 0;
+
+    const labelPrefix = includeDownloadPrefix ? "Download " : "";
+    const outerLabel = outerLabelOverride ? `${labelPrefix}${outerLabelOverride}` : onlyHasUnicodeEmojis ? `${labelPrefix}Unicode Emojis` : onlyHasCustomEmojis ? `${labelPrefix}Custom Emojis` : `${labelPrefix}Emojis`;
+    const innerUnicodeLabel = `${labelPrefix}Unicode Emojis`;
+    const innerCustomLabel = `${labelPrefix}Custom Emojis`;
+
+    return <Menu.MenuItem
+        key={`downloadify-${keyPrefix}-emojis-submenu`}
+        id={`downloadify-${keyPrefix}-emojis-submenu`}
+        label={outerLabel}
+    >
+        {onlyHasUnicodeEmojis && emojis.unicode.map(emoji => getEmojiMenuItem(emoji, false, true))}
+        {onlyHasCustomEmojis && emojis.custom.map(emoji => getEmojiMenuItem(emoji, false, true))}
+        {hasBothEmojiTypes && (
+            <>
+                <Menu.MenuItem
+                    key={`downloadify-${keyPrefix}-unicode-emojis-submenu`}
+                    id={`downloadify-${keyPrefix}-unicode-emojis-submenu`}
+                    label={innerUnicodeLabel}
+                >
+                    {emojis.unicode.map(emoji => getEmojiMenuItem(emoji, false, true))}
+                </Menu.MenuItem>
+                <Menu.MenuItem
+                    key={`downloadify-${keyPrefix}-custom-emojis-submenu`}
+                    id={`downloadify-${keyPrefix}-custom-emojis-submenu`}
+                    label={innerCustomLabel}
+                >
+                    {emojis.custom.map(emoji => getEmojiMenuItem(emoji, false, true))}
+                </Menu.MenuItem>
+            </>
+        )}
+    </Menu.MenuItem>;
+}
 
 export function MessageContextMenu(children: Array<any>, props: MessageContextMenuProps): void {
     if (!children?.length || !props?.message?.id) {
@@ -71,44 +138,44 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
     }, new Map<string, InviteData>()).values());
 
     const embedData = (message.embeds || []).map(embed => {
-        let data: any = {};
+        const data: any = {};
 
         if (["gifv", "video"].includes(embed.type)) {
             const tenor = embed.type === "gifv";
-            data["type"] = tenor ? "TENOR" : "VIDEO";
+            data.type = tenor ? "TENOR" : "VIDEO";
 
             if (embed.video) {
                 const parsedVideoURL = parseURL(embed.video.url);
                 const parsedVideoURLIsTrusted = parsedVideoURL?.source && parsedVideoURL.source !== AssetSource.UNKNOWN;
 
-                data["videos"] = [{
+                data.videos = [{
                     video: parsedVideoURLIsTrusted ? embed.video.url : embed.video.proxyURL || null,
                     videoExternal: embed.video.url || null,
                     videoProxy: embed.video.proxyURL || null,
                     videoMime: (embed.video as any)?.contentType || null
                 }].filter(v => v.video);
             } else {
-                data["videos"] = [];
+                data.videos = [];
             }
 
-            if (!tenor && data["videos"].length === 0 && embed.thumbnail) {
+            if (!tenor && data.videos.length === 0 && embed.thumbnail) {
                 const parsedThumbnailURL = parseURL(embed.thumbnail.url);
                 const parsedThumbnailURLIsTrusted = parsedThumbnailURL?.source && parsedThumbnailURL.source !== AssetSource.UNKNOWN;
                 const thumbnailURL = (parsedThumbnailURLIsTrusted ? embed.thumbnail.url : embed.thumbnail.proxyURL) || null;
-                data["thumbnail"] = thumbnailURL;
-                data["thumbnailExternal"] = embed.thumbnail.url || null;
-                data["thumbnailProxy"] = embed.thumbnail.proxyURL || null;
-                data["thumbnailMime"] = (embed.thumbnail as any)?.contentType || null;
-                data["thumbnailAnimated"] = (embed.thumbnail as any)?.srcIsAnimated ?? false;
+                data.thumbnail = thumbnailURL;
+                data.thumbnailExternal = embed.thumbnail.url || null;
+                data.thumbnailProxy = embed.thumbnail.proxyURL || null;
+                data.thumbnailMime = (embed.thumbnail as any)?.contentType || null;
+                data.thumbnailAnimated = (embed.thumbnail as any)?.srcIsAnimated ?? false;
             }
         } else if (embed.type === "image") {
-            data["type"] = "IMAGE";
+            data.type = "IMAGE";
 
             if (embed.image) {
                 const parsedImageURL = parseURL(embed.image.url);
                 const parsedImageURLIsTrusted = parsedImageURL?.source && parsedImageURL.source !== AssetSource.UNKNOWN;
 
-                data["images"] = [{
+                data.images = [{
                     image: (parsedImageURLIsTrusted ? embed.image.url : embed.image.proxyURL) || null,
                     imageExternal: embed.image.url || null,
                     imageProxy: embed.image.proxyURL || null,
@@ -116,46 +183,46 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
                     imageMime: (embed.image as any)?.contentType || null
                 }].filter(img => img.image);
             } else {
-                data["images"] = [];
+                data.images = [];
             }
         } else if (["rich", "article", "link"].includes(embed.type)) {
-            data["type"] = "BLOCK";
-            data["emojis"] = extractEmojis(JSON.stringify(embed));
+            data.type = "BLOCK";
+            data.emojis = extractEmojis(JSON.stringify(embed));
 
             if (embed.author?.iconURL) {
                 const parsedAuthorIconURL = parseURL(embed.author.iconURL);
                 const parsedAuthorIconURLIsTrusted = parsedAuthorIconURL?.source && parsedAuthorIconURL.source !== AssetSource.UNKNOWN;
                 const authorIconURL = (parsedAuthorIconURLIsTrusted ? embed.author.iconURL : embed.author.iconProxyURL) || null;
-                data["author"] = authorIconURL;
-                data["authorExternal"] = embed.author.iconURL || null;
-                data["authorProxy"] = embed.author.iconProxyURL || null;
-                data["authorMime"] = (embed.author as any)?.contentType || null;
+                data.author = authorIconURL;
+                data.authorExternal = embed.author.iconURL || null;
+                data.authorProxy = embed.author.iconProxyURL || null;
+                data.authorMime = (embed.author as any)?.contentType || null;
             }
 
             if ((embed as any).footer?.iconURL) {
                 const parsedFooterIconURL = parseURL((embed as any).footer.iconURL);
                 const parsedFooterIconURLIsTrusted = parsedFooterIconURL?.source && parsedFooterIconURL.source !== AssetSource.UNKNOWN;
                 const footerIconURL = (parsedFooterIconURLIsTrusted ? (embed as any).footer.iconURL : (embed as any).footer.iconProxyURL) || null;
-                data["footer"] = footerIconURL;
-                data["footerExternal"] = (embed as any).footer.iconURL || null;
-                data["footerProxy"] = (embed as any).footer.iconProxyURL || null;
-                data["footerMime"] = (embed as any)?.footer?.contentType || null;
+                data.footer = footerIconURL;
+                data.footerExternal = (embed as any).footer.iconURL || null;
+                data.footerProxy = (embed as any).footer.iconProxyURL || null;
+                data.footerMime = (embed as any)?.footer?.contentType || null;
             }
 
             if (embed.thumbnail?.url) {
                 const parsedThumbnailURL = parseURL(embed.thumbnail.url);
                 const parsedThumbnailURLIsTrusted = parsedThumbnailURL?.source && parsedThumbnailURL.source !== AssetSource.UNKNOWN;
                 const thumbnailURL = (parsedThumbnailURLIsTrusted ? embed.thumbnail.url : embed.thumbnail.proxyURL) || null;
-                data["thumbnail"] = thumbnailURL;
-                data["thumbnailExternal"] = embed.thumbnail.url || null;
-                data["thumbnailProxy"] = embed.thumbnail.proxyURL || null;
-                data["thumbnailMime"] = (embed.thumbnail as any)?.contentType || null;
-                data["thumbnailAnimated"] = (embed.thumbnail as any)?.srcIsAnimated ?? false;
+                data.thumbnail = thumbnailURL;
+                data.thumbnailExternal = embed.thumbnail.url || null;
+                data.thumbnailProxy = embed.thumbnail.proxyURL || null;
+                data.thumbnailMime = (embed.thumbnail as any)?.contentType || null;
+                data.thumbnailAnimated = (embed.thumbnail as any)?.srcIsAnimated ?? false;
             }
 
             const images = !!(embed as any).images?.length ? (embed as any).images : (embed).image ? [embed.image] : [];
 
-            data["images"] = images.map((img: any) => {
+            data.images = images.map((img: any) => {
                 const parsedImageURL = parseURL(img.url);
                 const parsedImageURLIsTrusted = parsedImageURL?.source && parsedImageURL.source !== AssetSource.UNKNOWN;
 
@@ -172,14 +239,14 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
                 const parsedVideoURL = parseURL(embed.video.url);
                 const parsedVideoURLIsTrusted = parsedVideoURL?.source && parsedVideoURL.source !== AssetSource.UNKNOWN;
 
-                data["videos"] = [{
+                data.videos = [{
                     video: (parsedVideoURLIsTrusted ? embed.video.url : embed.video.proxyURL) || null,
                     videoExternal: embed.video.url || null,
                     videoProxy: embed.video.proxyURL || null,
                     videoMime: (embed.video as any)?.contentType || null
                 }].filter(v => v.video);
             } else {
-                data["videos"] = [];
+                data.videos = [];
             }
         } else {
             return null;
@@ -385,17 +452,50 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
     const targetedEmbedMedia = embedData.reduce<{ primary?: string | null; secondary?: string | null; mime?: string | null; target?: string; } | null>((result, data) => {
         if (result) return result;
 
-        const image = data.images?.find(img => img.imageProxy === targetProxy || img.imageProxy === targetSRC || img.imageExternal === targetSRC || img.imageExternal === targetProxy) || "";
+        const image = data.images?.find(img => {
+            const imageProxyParsed = !img.imageProxy ? null : new URL(img.imageProxy);
+            const imageProxy = imageProxyParsed ? `${imageProxyParsed.origin}${imageProxyParsed.pathname}` : "";
+            const imageExternalParsed = !img.imageExternal ? null : new URL(img.imageExternal);
+            const imageExternal = imageExternalParsed ? `${imageExternalParsed.origin}${imageExternalParsed.pathname}` : "";
+
+            return imageProxy === targetProxy || imageProxy === targetSRC || imageExternal === targetSRC || imageExternal === targetProxy;
+        }) || "";
+
         if (image) return { primary: image.image, mime: image.imageMime, target: "Image" };
 
-        if (data.authorProxy === targetProxy || data.authorProxy === targetSRC || data.authorExternal === targetSRC || data.authorExternal === targetProxy) return { primary: data.author, mime: data.authorMime, target: "Author Icon" };
-        if (data.footerProxy === targetProxy || data.footerProxy === targetSRC || data.footerExternal === targetSRC || data.footerExternal === targetProxy) return { primary: data.footer, mime: data.footerMime, target: "Footer Icon" };
-        if (data.thumbnailProxy === targetProxy || data.thumbnailProxy === targetSRC || data.thumbnailExternal === targetSRC || data.thumbnailExternal === targetProxy) return { primary: data.thumbnail, mime: data.thumbnailMime, target: "Thumbnail" };
+        const authorProxyParsed = !data.authorProxy ? null : new URL(data.authorProxy);
+        const authorProxy = authorProxyParsed ? `${authorProxyParsed.origin}${authorProxyParsed.pathname}` : "";
+        const authorExternalParsed = !data.authorExternal ? null : new URL(data.authorExternal);
+        const authorExternal = authorExternalParsed ? `${authorExternalParsed.origin}${authorExternalParsed.pathname}` : "";
+        const footerProxyParsed = !data.footerProxy ? null : new URL(data.footerProxy);
+        const footerProxy = footerProxyParsed ? `${footerProxyParsed.origin}${footerProxyParsed.pathname}` : "";
+        const footerExternalParsed = !data.footerExternal ? null : new URL(data.footerExternal);
+        const footerExternal = footerExternalParsed ? `${footerExternalParsed.origin}${footerExternalParsed.pathname}` : "";
+        const thumbnailProxyParsed = !data.thumbnailProxy ? null : new URL(data.thumbnailProxy);
+        const thumbnailProxy = thumbnailProxyParsed ? `${thumbnailProxyParsed.origin}${thumbnailProxyParsed.pathname}` : "";
+        const thumbnailExternalParsed = !data.thumbnailExternal ? null : new URL(data.thumbnailExternal);
+        const thumbnailExternal = thumbnailExternalParsed ? `${thumbnailExternalParsed.origin}${thumbnailExternalParsed.pathname}` : "";
+
+        if (authorProxy === targetProxy || authorProxy === targetSRC || authorExternal === targetSRC || authorExternal === targetProxy) return { primary: data.author, mime: data.authorMime, target: "Author Icon" };
+        if (footerProxy === targetProxy || footerProxy === targetSRC || footerExternal === targetSRC || footerExternal === targetProxy) return { primary: data.footer, mime: data.footerMime, target: "Footer Icon" };
+        if (thumbnailProxy === targetProxy || thumbnailProxy === targetSRC || thumbnailExternal === targetSRC || thumbnailExternal === targetProxy) return { primary: data.thumbnail, mime: data.thumbnailMime, target: "Thumbnail" };
+
         // Discord does not always pass video data to the context menu
         // for embedded videos, so querying for the element is necessary.
         const videoElement = targetElement?.closest("[class*=embedVideo]")?.querySelector("video");
         const videoSrc = videoElement?.src || "";
-        let video = data.videos?.find(v => v.videoProxy === videoSrc || v.videoExternal === videoSrc || v.videoProxy === targetProxy || v.videoProxy === targetSRC || v.videoExternal === targetSRC || v.videoExternal === targetProxy) || null;
+        const videoElementSrcParsed = !videoSrc ? null : new URL(videoSrc);
+        const videoElementSrc = videoElementSrcParsed ? `${videoElementSrcParsed.origin}${videoElementSrcParsed.pathname}` : "";
+
+        const video = data.videos?.find(v => {
+            const videoProxyParsed = !v.videoProxy ? null : new URL(v.videoProxy);
+            const videoProxy = videoProxyParsed ? `${videoProxyParsed.origin}${videoProxyParsed.pathname}` : "";
+            const videoExternalParsed = !v.videoExternal ? null : new URL(v.videoExternal);
+            const videoExternal = videoExternalParsed ? `${videoExternalParsed.origin}${videoExternalParsed.pathname}` : "";
+
+            return videoProxy === videoElementSrc || videoExternal === videoElementSrc || videoProxy === targetProxy || videoProxy === targetSRC || videoExternal === targetSRC || videoExternal === targetProxy;
+        }) || null;
+
         if (video) return { primary: video.video, mime: video.videoMime, target: (data.type === "VIDEO" || (data.type === "BLOCK" && videoSrc)) ? "Video" : "Tenor GIF" };
 
         return null;
@@ -404,10 +504,26 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
     const targetedComponentMedia = componentData.reduce<{ primary?: string | null; secondary?: string | null; mime?: string | null; target?: string; } | null>((result, component) => {
         if (result) return result;
 
-        const thumbnail = component.items.find(item => item.type === "THUMBNAIL" && (item.thumbnailProxy === targetProxy || item.thumbnailProxy === targetSRC || item.thumbnailExternal === targetSRC || item.thumbnailExternal === targetProxy)) || "";
+        const thumbnail = component.items.find(item => {
+            const thumbnailProxyParsed = !item.thumbnailProxy ? null : new URL(item.thumbnailProxy);
+            const thumbnailProxy = thumbnailProxyParsed ? `${thumbnailProxyParsed.origin}${thumbnailProxyParsed.pathname}` : "";
+            const thumbnailExternalParsed = !item.thumbnailExternal ? null : new URL(item.thumbnailExternal);
+            const thumbnailExternal = thumbnailExternalParsed ? `${thumbnailExternalParsed.origin}${thumbnailExternalParsed.pathname}` : "";
+
+            return item.type === "THUMBNAIL" && (thumbnailProxy === targetProxy || thumbnailProxy === targetSRC || thumbnailExternal === targetSRC || thumbnailExternal === targetProxy);
+        }) || "";
+
         if (thumbnail) return { primary: thumbnail.thumbnail, mime: thumbnail.thumbnailMime, target: "Thumbnail" };
 
-        const media = component.items.find(item => item.type === "MEDIA" && (item.mediaProxy === targetProxy || item.mediaProxy === targetSRC || item.mediaExternal === targetSRC || item.mediaExternal === targetProxy)) || "";
+        const media = component.items.find(item => {
+            const mediaProxyParsed = !item.mediaProxy ? null : new URL(item.mediaProxy);
+            const mediaProxy = mediaProxyParsed ? `${mediaProxyParsed.origin}${mediaProxyParsed.pathname}` : "";
+            const mediaExternalParsed = !item.mediaExternal ? null : new URL(item.mediaExternal);
+            const mediaExternal = mediaExternalParsed ? `${mediaExternalParsed.origin}${mediaExternalParsed.pathname}` : "";
+
+            return item.type === "MEDIA" && (mediaProxy === targetProxy || mediaProxy === targetSRC || mediaExternal === targetSRC || mediaExternal === targetProxy);
+        }) || "";
+
         if (media) return { primary: media.media, mime: media.mediaMime, target: "Media" };
 
         return null;
@@ -436,37 +552,12 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
         const targetedInviteElementMembers = targetedInviteElement?.querySelector("[class*=memberCount]:nth-of-type(2) div:nth-of-type(2)")?.textContent?.split(" ")[0] || null;
 
         return (targetedInviteElementName && invite.profile?.name === targetedInviteElementName) &&
-            (targetedInviteElementOnline && invite.profile?.online_count === Number(targetedInviteElementOnline.replace(/\D/g, ''))) &&
-            (targetedInviteElementMembers && invite.profile?.member_count === Number(targetedInviteElementMembers.replace(/\D/g, '')));
+            (targetedInviteElementOnline && invite.profile?.online_count === Number(targetedInviteElementOnline.replace(/\D/g, ""))) &&
+            (targetedInviteElementMembers && invite.profile?.member_count === Number(targetedInviteElementMembers.replace(/\D/g, "")));
     })) || null;
 
     const anyTargetedItem = !!(targetedEmoji || targetedSticker || targetedEmbedMedia || targetedComponentMedia || targetedAttachment || targetedInvite);
     const downloadifyItems: any[] = [];
-
-    function getEmojiMenuItem(emoji: ExtractedEmoji, isTargeted: boolean = false, isSubmenuItem: boolean = false) {
-        const isUnicodeEmoji = !(emoji as any).id;
-        const isCustomEmoji = !isUnicodeEmoji;
-        const isAnimated = isUnicodeEmoji ? false : (emoji as any).animated;
-        const emojiURL = isCustomEmoji
-            ? `${ASSET_MEDIA_PROXY_BASE.origin}/emojis/${(emoji as any).id}.${isAnimated ? "gif" : "png"}`
-            : `${PRIMARY_DOMAIN_BASE.origin}${(emoji as any).path}`;
-
-        return <Menu.MenuItem
-            key={`downloadify-${isTargeted ? "targeted-" : ""}${sanitizeFilename(emoji.name, {})}-emoji`}
-            id={`downloadify-${isTargeted ? "targeted-" : ""}${sanitizeFilename(emoji.name, {})}-emoji`}
-            label={`${isSubmenuItem ? "" : "Download "}:${emoji.name}:`}
-            submenuItemLabel={`${isTargeted ? "Targeted Emoji " : ""}:${emoji.name}:`}
-            icon={() => ImageAsIcon({ src: emojiURL, width: 20, height: 20 })}
-            action={async () => await handleDownload({
-                alias: `${sanitizeFilename(emoji.name, {})}-emoji`,
-                animatable: false,
-                urls: { primary: emojiURL },
-                mime: isUnicodeEmoji ? "image/svg+xml" : !isAnimated ? "image/png" : "image/gif",
-                classifier: isCustomEmoji ? AssetType.CUSTOM_EMOJI : AssetType.UNICODE_EMOJI,
-                size: null
-            })}
-        />;
-    }
 
     function getStickerMenuItem(sticker: any, isTargeted: boolean = false, isSubmenuItem: boolean = false) {
         const stickerData = StickersStore.getStickerById(sticker.id);
@@ -585,46 +676,6 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
                 size: attachment.size
             })}
         />;
-    }
-
-    function getEmojiSubmenu(emojis: ExtractedEmojis, keyPrefix: string, includeDownloadPrefix: boolean = false) {
-        if (emojis.unicode.length === 0 && emojis.custom.length === 0) {
-            return null;
-        }
-
-        const onlyHasUnicodeEmojis = emojis.unicode.length > 0 && emojis.custom.length === 0;
-        const onlyHasCustomEmojis = emojis.unicode.length === 0 && emojis.custom.length > 0;
-        const hasBothEmojiTypes = emojis.unicode.length > 0 && emojis.custom.length > 0;
-
-        const labelPrefix = includeDownloadPrefix ? "Download " : "";
-        const label = onlyHasUnicodeEmojis ? `${labelPrefix}Unicode Emojis` : onlyHasCustomEmojis ? `${labelPrefix}Custom Emojis` : `${labelPrefix}Emojis`;
-
-        return <Menu.MenuItem
-            key={`downloadify-${keyPrefix}-emojis-submenu`}
-            id={`downloadify-${keyPrefix}-emojis-submenu`}
-            label={label}
-        >
-            {onlyHasUnicodeEmojis && emojis.unicode.map(emoji => getEmojiMenuItem(emoji, false, true))}
-            {onlyHasCustomEmojis && emojis.custom.map(emoji => getEmojiMenuItem(emoji, false, true))}
-            {hasBothEmojiTypes && (
-                <>
-                    <Menu.MenuItem
-                        key={`downloadify-${keyPrefix}-unicode-emojis-submenu`}
-                        id={`downloadify-${keyPrefix}-unicode-emojis-submenu`}
-                        label="Unicode Emojis"
-                    >
-                        {emojis.unicode.map(emoji => getEmojiMenuItem(emoji, false, true))}
-                    </Menu.MenuItem>
-                    <Menu.MenuItem
-                        key={`downloadify-${keyPrefix}-custom-emojis-submenu`}
-                        id={`downloadify-${keyPrefix}-custom-emojis-submenu`}
-                        label="Custom Emojis"
-                    >
-                        {emojis.custom.map(emoji => getEmojiMenuItem(emoji, false, true))}
-                    </Menu.MenuItem>
-                </>
-            )}
-        </Menu.MenuItem>;
     }
 
     function getInviteMenuItem(invite: InviteData, isTargeted: boolean = false) {
@@ -1016,118 +1067,158 @@ export function QuestTileContextMenu(children: Array<any>, props: QuestTileConte
         for (const [index, reward] of rewardsConfig.rewards.entries()) {
             if (!reward.skuId) {
                 continue;
-            }
+            } else if (reward.skuId === ORBS_SKU_ID) {
+                downloadifyItems.push(
+                    <Menu.MenuItem
+                        id={"downloadify-orbs-quest-reward"}
+                        label={"Orbs Reward"}
+                        icon={() => ImageAsIcon({ src: ORBS_REWARD_PNG, width: 20, height: 20 })}
+                        action={async () => await handleDownload({
+                            alias: `${questNameCleaned}-orbs-reward`,
+                            animatable: true,
+                            urls: { primary: ORBS_REWARD_WEBM },
+                            mime: null,
+                            classifier: AssetType.GENERIC_WEBM,
+                            size: null,
+                        })}
+                    />
+                );
+            } else {
+                const collectible = CollectiblesData.getch(reward.skuId);
 
-            const collectible = CollectiblesData.getch(reward.skuId);
+                if (!collectible) {
+                    const { asset } = reward;
 
-            if (!collectible) {
-                continue;
-            }
+                    if (!asset) {
+                        continue;
+                    }
 
-            const typeText = collectible.type === CollectibleType.AVATAR_DECORATION
-                ? "Decoration"
-                : collectible.type === CollectibleType.NAMEPLATE
-                    ? "Nameplate"
-                    : collectible.type === CollectibleType.PROFILE_EFFECT
-                        ? "Effect"
-                        : null;
+                    const assetCDNURL = `${CDN_BASE.origin}/${asset}`;
+                    const assetCDNPNGURL = assetCDNURL + "?format=png";
+                    const rewardNameSanitized = reward.messages.name ? sanitizeFilename(reward.messages.name, {}) : null;
 
-            if (!typeText) {
-                continue;
-            }
-
-            const nonEffectClassifier = collectible.type === CollectibleType.AVATAR_DECORATION
-                ? AssetType.AVATAR_DECORATION
-                : collectible.type === CollectibleType.NAMEPLATE
-                    ? AssetType.NAMEPLATE
-                    : null;
-
-            const decorationURL = collectible.type === CollectibleType.AVATAR_DECORATION
-                ? `${ASSET_MEDIA_PROXY_BASE.origin}/avatar-decoration-presets/${collectible.asset}.png`
-                : null;
-
-            const nameplateURL = collectible.type === CollectibleType.NAMEPLATE
-                ? `${CDN_BASE.origin}/assets/collectibles/${collectible.asset}static.png`
-                : null;
-
-            const nonEffectURL = decorationURL || nameplateURL;
-            const rewardNameSanitized = sanitizeFilename(collectible.name, {});
-            const rewardNameCleaned = (rewardNameSanitized ? (rewardNameSanitized + `-${typeText.toLocaleLowerCase()}`) : typeText.toLowerCase()) + `-reward-${index}`;
-
-            const icon = !decorationURL
-                ? () => ImageIcon({ width: 20, height: 20 })
-                : () => ImageAsIcon({ src: decorationURL, width: 20, height: 20 });
-
-            downloadifyItems.push(
-                collectible.type === CollectibleType.PROFILE_EFFECT
-                    ? (
+                    downloadifyItems.push(
                         <Menu.MenuItem
-                            id={`downloadify-${rewardNameCleaned}-quest-reward`}
-                            label={`${collectible.name} ${typeText}`}
-                        >
-                            <Menu.MenuItem
-                                id="downloadify-quest-reward-profile-effect-thumbnail"
-                                label="Thumbnail"
-                                icon={icon}
-                                action={async () => await handleDownload(
-                                    {
-                                        alias: `${rewardNameCleaned ? `${rewardNameCleaned}-` : ""}thumbnail`,
-                                        animatable: false,
-                                        urls: { primary: collectible.thumbnailPreviewSrc },
-                                        mime: "image/png",
-                                        classifier: AssetType.PROFILE_EFFECT_THUMBNAIL,
-                                        size: null,
-                                    }
-                                )}
-                            />
-                            <Menu.MenuItem
-                                id="downloadify-quest-reward-profile-effect-primary"
-                                label="Primary"
-                                icon={icon}
-                                action={async () => await handleDownload(
-                                    {
-                                        alias: `${rewardNameCleaned ? `${rewardNameCleaned}-` : ""}primary`,
-                                        animatable: true,
-                                        urls: { primary: collectible.effects[0].src },
-                                        mime: "image/png",
-                                        classifier: AssetType.PROFILE_EFFECT_PRIMARY,
-                                        size: null,
-                                    }
-                                )}
-                            />
-                            <Menu.MenuItem
-                                id="downloadify-quest-reward-profile-effect-secondary"
-                                label="Secondary"
-                                icon={icon}
-                                action={async () => await handleDownload(
-                                    {
-                                        alias: `${rewardNameCleaned ? `${rewardNameCleaned}-` : ""}secondary`,
-                                        animatable: true,
-                                        urls: { primary: collectible.effects[1].src },
-                                        mime: "image/png",
-                                        classifier: AssetType.PROFILE_EFFECT_SECONDARY,
-                                        size: null,
-                                    }
-                                )}
-                            />
-                        </Menu.MenuItem>
-                    )
-                    : (
-                        <Menu.MenuItem
-                            id={`downloadify-${rewardNameCleaned}-quest-reward`}
-                            label={`${collectible.name} ${typeText}`}
-                            icon={icon}
+                            id={`downloadify-${rewardNameSanitized ? rewardNameSanitized + "-game-reward" : "game-reward"}`}
+                            label={reward.messages.name || "Game Reward"}
+                            icon={() => ImageAsIcon({ src: assetCDNPNGURL, width: 20, height: 20 })}
                             action={async () => await handleDownload({
-                                alias: rewardNameCleaned,
+                                alias: rewardNameSanitized || "game-reward",
                                 animatable: true,
-                                urls: { primary: nonEffectURL! },
+                                urls: { primary: assetCDNURL },
                                 mime: null,
-                                classifier: nonEffectClassifier,
-                                size: null
+                                classifier: null,
+                                size: null,
                             })}
                         />
-                    )
-            );
+                    );
+                } else {
+                    const typeText = collectible.type === CollectibleType.AVATAR_DECORATION
+                        ? "Decoration"
+                        : collectible.type === CollectibleType.NAMEPLATE
+                            ? "Nameplate"
+                            : collectible.type === CollectibleType.PROFILE_EFFECT
+                                ? "Effect"
+                                : null;
+
+                    if (!typeText) {
+                        continue;
+                    }
+
+                    const nonEffectClassifier = collectible.type === CollectibleType.AVATAR_DECORATION
+                        ? AssetType.AVATAR_DECORATION
+                        : collectible.type === CollectibleType.NAMEPLATE
+                            ? AssetType.NAMEPLATE
+                            : null;
+
+                    const decorationURL = collectible.type === CollectibleType.AVATAR_DECORATION
+                        ? `${ASSET_MEDIA_PROXY_BASE.origin}/avatar-decoration-presets/${collectible.asset}.png`
+                        : null;
+
+                    const nameplateURL = collectible.type === CollectibleType.NAMEPLATE
+                        ? `${CDN_BASE.origin}/assets/collectibles/${collectible.asset}static.png`
+                        : null;
+
+                    const nonEffectURL = decorationURL || nameplateURL;
+                    const rewardNameSanitized = sanitizeFilename(collectible.name, {});
+                    const rewardNameCleaned = (rewardNameSanitized ? (rewardNameSanitized + `-${typeText.toLocaleLowerCase()}`) : typeText.toLowerCase()) + `-reward-${index}`;
+
+                    const icon = !decorationURL
+                        ? () => ImageIcon({ width: 20, height: 20 })
+                        : () => ImageAsIcon({ src: decorationURL, width: 20, height: 20 });
+
+                    downloadifyItems.push(
+                        collectible.type === CollectibleType.PROFILE_EFFECT
+                            ? (
+                                <Menu.MenuItem
+                                    id={`downloadify-${rewardNameCleaned}-quest-reward`}
+                                    label={`${collectible.name} ${typeText}`}
+                                >
+                                    <Menu.MenuItem
+                                        id="downloadify-quest-reward-profile-effect-thumbnail"
+                                        label="Thumbnail"
+                                        icon={icon}
+                                        action={async () => await handleDownload(
+                                            {
+                                                alias: `${rewardNameCleaned ? `${rewardNameCleaned}-` : ""}thumbnail`,
+                                                animatable: false,
+                                                urls: { primary: collectible.thumbnailPreviewSrc },
+                                                mime: "image/png",
+                                                classifier: AssetType.PROFILE_EFFECT_THUMBNAIL,
+                                                size: null,
+                                            }
+                                        )}
+                                    />
+                                    <Menu.MenuItem
+                                        id="downloadify-quest-reward-profile-effect-primary"
+                                        label="Primary"
+                                        icon={icon}
+                                        action={async () => await handleDownload(
+                                            {
+                                                alias: `${rewardNameCleaned ? `${rewardNameCleaned}-` : ""}primary`,
+                                                animatable: true,
+                                                urls: { primary: collectible.effects[0].src },
+                                                mime: "image/png",
+                                                classifier: AssetType.PROFILE_EFFECT_PRIMARY,
+                                                size: null,
+                                            }
+                                        )}
+                                    />
+                                    <Menu.MenuItem
+                                        id="downloadify-quest-reward-profile-effect-secondary"
+                                        label="Secondary"
+                                        icon={icon}
+                                        action={async () => await handleDownload(
+                                            {
+                                                alias: `${rewardNameCleaned ? `${rewardNameCleaned}-` : ""}secondary`,
+                                                animatable: true,
+                                                urls: { primary: collectible.effects[1].src },
+                                                mime: "image/png",
+                                                classifier: AssetType.PROFILE_EFFECT_SECONDARY,
+                                                size: null,
+                                            }
+                                        )}
+                                    />
+                                </Menu.MenuItem>
+                            )
+                            : (
+                                <Menu.MenuItem
+                                    id={`downloadify-${rewardNameCleaned}-quest-reward`}
+                                    label={`${collectible.name} ${typeText}`}
+                                    icon={icon}
+                                    action={async () => await handleDownload({
+                                        alias: rewardNameCleaned,
+                                        animatable: true,
+                                        urls: { primary: nonEffectURL! },
+                                        mime: null,
+                                        classifier: nonEffectClassifier,
+                                        size: null
+                                    })}
+                                />
+                            )
+                    );
+                }
+            }
         }
     }
 
@@ -2671,12 +2762,31 @@ export function UserContextMenu(children: Array<any>, props: UserContextMenuProp
     const hasClanBade = !!user.primaryGuild?.identityEnabled && !!clanBadgeHash && !!clanBadgeGuildID && !!clanBadgeText;
     const clanBadgeTextCleaned = !hasClanBade ? null : clanBadgeText.match(/[^a-z]/gi) ? null : clanBadgeText;
 
+    const activities = PresenceStore.getActivities(user.id);
+    const customStatus = activities.find(activity => activity.id === "custom");
+    const customStatusEmoji = customStatus?.emoji;
+
     const iconRoleID = member?.iconRoleId;
     const roleWithIcon = !iconRoleID ? null : GuildRoleStore.getRole(guild!.id, iconRoleID);
     const roleIconCustom = roleWithIcon?.icon;
     const roleIconUnicode = roleWithIcon?.unicodeEmoji ? getUnicodeEmojiPath(roleWithIcon.unicodeEmoji) : null;
     const roleWithIconName = roleWithIcon?.name ?? "";
     const roleWithIconNameCleaned = !roleWithIcon ? null : sanitizeFilename(roleWithIconName, {});
+
+    const userBioEmojis = (() => {
+        const emojis = userProfile?.bio ? extractEmojis(userProfile.bio) : null;
+        return emojis?.unicode.length || emojis?.custom.length ? emojis : null;
+    })();
+    const memberBioEmojis = (() => {
+        const emojis = memberProfile?.bio ? extractEmojis(memberProfile.bio) : null;
+        const uniqueUnicode = emojis?.unicode.filter(emoji => !userBioEmojis?.unicode.some(e => e.path === emoji.path));
+        const uniqueCustom = emojis?.custom.filter(emoji => !userBioEmojis?.custom.some(e => e.id === emoji.id));
+        const uniqueEmojisNotInUserBio = (uniqueUnicode?.length || uniqueCustom?.length) ? {
+            unicode: uniqueUnicode || [],
+            custom: uniqueCustom || []
+        } : null;
+        return uniqueEmojisNotInUserBio;
+    })();
 
     const userAvatarHash = user.avatar || null;
     const memberAvatarHash = (() => {
@@ -2723,6 +2833,11 @@ export function UserContextMenu(children: Array<any>, props: UserContextMenuProp
     const memberNameplateURL = memberNameplate ? `${CDN_BASE.origin}/assets/collectibles/${memberNameplate.asset}static.png` : null;
     const defaultUserAvatarURL = `${PRIMARY_DOMAIN_BASE.origin}${defaultAssets.DEFAULT_AVATARS[user.discriminator === "0" ? (Math.floor(Number(BigInt(user.id) >> 22n)) % 6) : (Number(user.discriminator) % 5)]}`;
     const clanBadgeURL = hasClanBade ? `${ASSET_MEDIA_PROXY_BASE.origin}/clan-badges/${clanBadgeGuildID}/${clanBadgeHash}.png` : null;
+    const customStatusEmojiURL = customStatusEmoji?.id
+        ? `${ASSET_MEDIA_PROXY_BASE.origin}/emojis/${customStatusEmoji.id}.${customStatusEmoji.animated ? "gif" : "png"}`
+        : customStatusEmoji?.name
+            ? `${PRIMARY_DOMAIN_BASE.origin}${getUnicodeEmojiPath(customStatusEmoji.name)}`
+            : null;
     const roleIconURL = roleIconCustom
         ? `${ASSET_MEDIA_PROXY_BASE.origin}/role-icons/${iconRoleID}/${roleIconCustom}.png`
         : roleIconUnicode
@@ -2803,6 +2918,22 @@ export function UserContextMenu(children: Array<any>, props: UserContextMenuProp
                 })}
             />
         ) : null,
+        customStatusEmojiURL ? (
+            <Menu.MenuItem
+                id="downloadify-status-emoji"
+                label="Download Status Emoji"
+                submenuItemLabel="Status Emoji"
+                icon={() => ImageAsIcon({ src: customStatusEmojiURL, width: 20, height: 20 })}
+                action={async () => await handleDownload({
+                    alias: `${user.username.replace(".", "-")}-status-emoji`,
+                    animatable: !!customStatusEmoji?.animated,
+                    urls: { primary: customStatusEmojiURL },
+                    mime: customStatusEmoji?.id ? (customStatusEmoji.animated ? "image/gif" : "image/png") : "image/svg+xml",
+                    classifier: customStatusEmoji?.id ? (customStatusEmoji.animated ? AssetType.CUSTOM_EMOJI : AssetType.CUSTOM_EMOJI) : AssetType.UNICODE_EMOJI,
+                    size: null
+                })}
+            />
+        ) : null,
         defaultUserAvatarURL ? (
             <Menu.MenuItem
                 id="downloadify-default-user-avatar"
@@ -2819,7 +2950,7 @@ export function UserContextMenu(children: Array<any>, props: UserContextMenuProp
                 })}
             />
         ) : null,
-        (profileConnections.length || profileBadges.length || clanBadgeURL || defaultUserAvatarURL) && (userAvatarURL || userBannerURL || userAvatarDecorationURL || userNameplateURL || userProfileEffect)
+        (profileConnections.length || profileBadges.length || clanBadgeURL || customStatusEmojiURL || defaultUserAvatarURL) && (userAvatarURL || userBannerURL || userAvatarDecorationURL || userNameplateURL || userProfileEffect || userBioEmojis)
             ? <Menu.MenuSeparator /> : null,
         userAvatarURL ? (
             <Menu.MenuItem
@@ -2932,7 +3063,8 @@ export function UserContextMenu(children: Array<any>, props: UserContextMenuProp
                 />
             </Menu.MenuItem>
         ) : null,
-        (defaultUserAvatarURL || userAvatarURL || userBannerURL || userAvatarDecorationURL || userNameplateURL || userProfileEffect) && (roleIconURL || memberAvatarURL || memberBannerURL || memberAvatarDecorationURL || memberNameplateURL || memberProfileEffect)
+        userBioEmojis ? getEmojiSubmenu(userBioEmojis, "user-bio", false, "User Bio Emojis") : null,
+        (defaultUserAvatarURL || userAvatarURL || userBannerURL || userAvatarDecorationURL || userNameplateURL || userProfileEffect || userBioEmojis) && (roleIconURL || memberAvatarURL || memberBannerURL || memberAvatarDecorationURL || memberNameplateURL || memberProfileEffect || memberBioEmojis)
             ? <Menu.MenuSeparator /> : null,
         memberAvatarURL ? (
             <Menu.MenuItem
@@ -3060,7 +3192,8 @@ export function UserContextMenu(children: Array<any>, props: UserContextMenuProp
                     size: null
                 })}
             />
-        ) : null
+        ) : null,
+        memberBioEmojis ? getEmojiSubmenu(memberBioEmojis, "member-bio", false, "Member Bio Emojis") : null
     ].filter(Boolean);
 
     joinOrCreateContextMenuGroup(

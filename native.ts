@@ -240,11 +240,12 @@ export async function download(
     } else if (parsedPrimaryURL?.source === AssetSource.ASSET_MEDIA_PROXY) {
         parseDiscordURLs(parsedPrimaryURL, asset);
         buildDiscordURL(urls, parsedPrimaryURL, asset);
-    } else if (parsedSecondaryURL?.source === AssetSource.WIKIMEDIA) {
+    } else if ([parsedPrimaryURL.source, parsedSecondaryURL?.source].includes(AssetSource.WIKIMEDIA)) {
+        const parsedTarget = parsedPrimaryURL.source === AssetSource.WIKIMEDIA ? parsedPrimaryURL : parsedSecondaryURL!;
         let skipExternalProxy = false;
 
-        if (parsedSecondaryURL.path.startsWith("/wikipedia/commons/thumb")) {
-            const fullImage = parseURL(parsedSecondaryURL.url.href.replace("/thumb/", "/").split("/").slice(0, -1).join("/"));
+        if (parsedTarget.path.startsWith("/wikipedia/commons/thumb")) {
+            const fullImage = parseURL(parsedTarget.url.href.replace("/thumb/", "/").split("/").slice(0, -1).join("/"));
             asset.alias = fullImage.baseName;
 
             if (fullImage.extension === "svg") {
@@ -254,7 +255,7 @@ export async function download(
                 const exts = assetAvailability[AssetSource.WIKIMEDIA]?.[AssetType.WIKIMEDIA_SVG]?.static ?? [];
 
                 exts.forEach(ext => {
-                    urls.if[ext] ??= ext === "svg" ? fullImage.url.href : parsedSecondaryURL.url.href.replace(/\/1200px-/, "/4096px-").replace(/\.svg\.\w+$/, `.${ext}`);
+                    urls.if[ext] ??= ext === "svg" ? fullImage.url.href : parsedTarget.url.href.replace(/\/1200px-/, "/4096px-").replace(/\.svg\.\w+$/, `.${ext}`);
                 });
             } else if (fullImage.extension) {
                 urls.if[fullImage.extension] ??= fullImage.url.href;
@@ -264,17 +265,18 @@ export async function download(
         if (!skipExternalProxy && parsedPrimaryURL.source === AssetSource.EXTERNAL_IMAGE_PROXY) {
             buildDiscordURL(urls, parsedPrimaryURL, asset);
         }
-    } else if (parsedSecondaryURL?.source === AssetSource.TWITTER) {
+    } else if ([parsedPrimaryURL.source, parsedSecondaryURL?.source].includes(AssetSource.TWITTER)) {
+        const parsedTarget = parsedPrimaryURL.source === AssetSource.TWITTER ? parsedPrimaryURL : parsedSecondaryURL!;
         let skipExternalProxy = false;
 
-        if (["/ext_tw_video_thumb", "/media"].some(prefix => parsedSecondaryURL.path.startsWith(prefix))) {
+        if (["/ext_tw_video_thumb", "/media"].some(prefix => parsedTarget.path.startsWith(prefix))) {
             skipExternalProxy = true;
             // Twitter's backend will render all image assets as PNG, JPG, or WEBP, at their source size.
             // We request the largest image version available, matching Discord's max media proxy image sizing.
             const exts = assetAvailability[AssetSource.TWITTER]?.[AssetType.TWITTER_IMAGE]?.static ?? [];
 
             exts.forEach(ext => {
-                urls.if[ext] ??= parsedSecondaryURL.url.origin + parsedSecondaryURL.path + parsedSecondaryURL.baseName + (`?format=${ext}&name=4096x4096`);
+                urls.if[ext] ??= parsedTarget.url.origin + parsedTarget.path + parsedTarget.baseName + (`?format=${ext}&name=4096x4096`);
             });
         }
 
