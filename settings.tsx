@@ -36,9 +36,15 @@ function DefaultDirectorySetting(): JSX.Element {
         try {
             setErrorMessage(null);
             setDialogueOpen(true);
-            await DownloadifyNative.setDownloadDirectory();
-            const newDir = await DownloadifyNative.getDownloadDirectory();
-            setDefaultDirectory(newDir);
+            const error = await DownloadifyNative.setDownloadDirectory();
+            DownloadifyLogger.log(`[${getFormattedNow()}] [SET DOWNLOAD DIRECTORY]`, { error });
+
+            if (!!error) {
+                throw new Error(error);
+            } else {
+                const newDir = await DownloadifyNative.getDownloadDirectory();
+                setDefaultDirectory(newDir);
+            }
         } catch (error: any) {
             DownloadifyLogger.error(`[${getFormattedNow()}] [FAILED TO SET DOWNLOAD DIRECTORY]`, error);
             showToast("Failed to set download directory.", Toasts.Type.FAILURE, { duration: 3000 });
@@ -65,7 +71,7 @@ function DefaultDirectorySetting(): JSX.Element {
                 </Paragraph>
                 <div className={d("directory-container")}>
                     <Paragraph className={d("directory-display")}>
-                        {errorMessage || defaultDirectory || "No Directory Set"}
+                        {errorMessage || defaultDirectory || "No directory set."}
                     </Paragraph>
                     <div className={d("directory-buttons")}>
                         <Button

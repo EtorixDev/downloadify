@@ -17,20 +17,20 @@ import { parseDiscordURLs, parseFile, parseURL, sanitizeFilename } from "./utils
 NativeSettings.store.plugins.Downloadify ??= {};
 
 /** Ask the user to select a directory to save files. */
-export async function setDownloadDirectory(): Promise<void> {
+export async function setDownloadDirectory(): Promise<void | string> {
     const result = await dialog.showOpenDialog({
         properties: ["openDirectory"]
     });
 
     if (result.canceled || !result.filePaths.length) {
-        throw new Error("No directory selected.");
+        return "Directory selection canceled.";
     }
 
     const selectedPath = result.filePaths[0];
     const pathAccessible = await fileExists(selectedPath);
 
     if (!pathAccessible) {
-        throw new Error("Selected directory is not accessible.");
+        return "Selected directory is not accessible.";
     }
 
     NativeSettings.store.plugins.Downloadify.defaultDirectory = selectedPath;
