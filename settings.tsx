@@ -19,12 +19,14 @@ import { d, DownloadifyLogger, DownloadifyNative } from "./utils/nonative";
 
 function DefaultDirectorySetting(): JSX.Element {
     const [defaultDirectory, setDefaultDirectory] = useState<string | null>(null);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const [isDialogueOpen, setDialogueOpen] = useState(false);
 
     useEffect(() => {
         const loadDefaultDirectory = async () => {
             const dir = await DownloadifyNative.getDownloadDirectory();
             setDefaultDirectory(dir);
+            setErrorMessage(null);
         };
 
         loadDefaultDirectory();
@@ -32,13 +34,15 @@ function DefaultDirectorySetting(): JSX.Element {
 
     const handlePickDirectory = async () => {
         try {
+            setErrorMessage(null);
             setDialogueOpen(true);
             await DownloadifyNative.setDownloadDirectory();
             const newDir = await DownloadifyNative.getDownloadDirectory();
             setDefaultDirectory(newDir);
-        } catch (error) {
+        } catch (error: any) {
             DownloadifyLogger.error(`[${getFormattedNow()}] [FAILED TO SET DOWNLOAD DIRECTORY]`, error);
             showToast("Failed to set download directory.", Toasts.Type.FAILURE, { duration: 3000 });
+            setErrorMessage(error.message || "An unknown error occurred.");
         } finally {
             setDialogueOpen(false);
         }
@@ -47,6 +51,7 @@ function DefaultDirectorySetting(): JSX.Element {
     const handleClearDirectory = async () => {
         DownloadifyNative.clearDownloadDirectory();
         setDefaultDirectory(null);
+        setErrorMessage(null);
     };
 
     return (
@@ -60,7 +65,7 @@ function DefaultDirectorySetting(): JSX.Element {
                 </Paragraph>
                 <div className={d("directory-container")}>
                     <Paragraph className={d("directory-display")}>
-                        {defaultDirectory || "No Directory Set"}
+                        {errorMessage || defaultDirectory || "No Directory Set"}
                     </Paragraph>
                     <div className={d("directory-buttons")}>
                         <Button

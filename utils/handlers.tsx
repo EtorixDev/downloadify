@@ -1048,8 +1048,66 @@ export function MessageContextMenu(children: Array<any>, props: MessageContextMe
     );
 }
 
-export function QuestTileContextMenu(children: Array<any>, props: QuestTileContextMenuProps): void {
-    DownloadifyLogger.info(`[${getFormattedNow()}] [QUEST TILE CONTEXT MENU OPENED]\n`, props);
+export async function ClaimedQuestContextMenu(event: React.MouseEvent<HTMLButtonElement>, props: QuestTileContextMenuProps): Promise<void> {
+    const children: Array<any> = [];
+
+    DownloadifyLogger.info(`[${getFormattedNow()}] [CLAIMED QUEST TILE CONTEXT MENU OPENED]\n`, props);
+
+    const { quest } = props;
+
+    if (!quest) {
+        return;
+    }
+
+    QuestTileContextMenu(children, props, true);
+
+    if (children.length === 0 && !Vencord.Settings.plugins.Questify?.enabled) {
+        return;
+    }
+
+    ContextMenuApi.openContextMenu(event, () => {
+        return <Menu.Menu
+            navId="downloadify-claimed-quest-context-menu"
+            onClose={ContextMenuApi.closeContextMenu}
+            aria-label="Claimed Quest Menu"
+            contextMenuAPIArguments={[props]}
+        >
+            {children}
+        </Menu.Menu>;
+    });
+}
+
+export function ActiveQuestContextMenu(event: React.MouseEvent<HTMLDivElement>, props: QuestTileContextMenuProps): void {
+    const children: Array<any> = [];
+
+    DownloadifyLogger.info(`[${getFormattedNow()}] [ACTIVE QUEST TILE CONTEXT MENU OPENED]\n`, props);
+
+    const { quest } = props;
+
+    if (!quest) {
+        return;
+    }
+
+    QuestTileContextMenu(children, props, true);
+
+    if (children.length === 0 && !Vencord.Settings.plugins.Questify?.enabled) {
+        return;
+    }
+
+    ContextMenuApi.openContextMenu(event, () => {
+        return <Menu.Menu
+            navId="downloadify-active-quest-context-menu"
+            onClose={ContextMenuApi.closeContextMenu}
+            aria-label="Active Quest Menu"
+            contextMenuAPIArguments={[props]}
+        >
+            {children}
+        </Menu.Menu>;
+    });
+}
+
+export function QuestTileContextMenu(children: Array<any>, props: QuestTileContextMenuProps, delegated: boolean = false): void {
+    !delegated && DownloadifyLogger.info(`[${getFormattedNow()}] [QUEST TILE CONTEXT MENU OPENED]\n`, props);
 
     if (!props?.quest) {
         return;
@@ -1057,14 +1115,15 @@ export function QuestTileContextMenu(children: Array<any>, props: QuestTileConte
 
     const { quest } = props;
     const { config } = quest;
-    const { messages, assets, rewardsConfig, videoMetadata } = config;
+    const { messages, assets, rewards, rewardsConfig, videoMetadata } = config;
+
     const questNameSanitized = sanitizeFilename(messages.questName, {});
     const questNameCleaned = questNameSanitized ? `${questNameSanitized}-quest` : "quest";
-
+    const questRewards = rewards ?? rewardsConfig?.rewards ?? [];
     const downloadifyItems: any[] = [];
 
-    if (rewardsConfig?.rewards?.length) {
-        for (const [index, reward] of rewardsConfig.rewards.entries()) {
+    if (questRewards.length > 0) {
+        for (const [index, reward] of questRewards.entries()) {
             if (!reward.skuId) {
                 continue;
             } else if (reward.skuId === ORBS_SKU_ID) {
@@ -1708,6 +1767,7 @@ export function ShopCategoryHeaderContextMenu(event: React.MouseEvent<HTMLButton
             navId="downloadify-shop-category-header"
             onClose={ContextMenuApi.closeContextMenu}
             aria-label="Shop Header"
+            contextMenuAPIArguments={[props]}
         >
             <Menu.MenuItem
                 id="downloadify-shop-category-header-items"
@@ -1896,6 +1956,7 @@ export async function ShopListingContextMenu(event: React.MouseEvent<HTMLButtonE
             navId="downloadify-shop-listing"
             onClose={ContextMenuApi.closeContextMenu}
             aria-label="Shop Listing"
+            contextMenuAPIArguments={[props]}
         >
             <Menu.MenuItem
                 id="downloadify-shop-listing-items"
@@ -1915,6 +1976,7 @@ export function OrbsPopoutShopImageContextMenu(event: React.MouseEvent<HTMLButto
             navId="downloadify-orbs-shop-image"
             onClose={ContextMenuApi.closeContextMenu}
             aria-label="Orbs Shop Icon"
+            contextMenuAPIArguments={[props]}
         >
             <Menu.MenuItem
                 id="downloadify-orbs-shop-image-static"
@@ -1958,6 +2020,7 @@ export function QuestRewardContextMenu(event: React.MouseEvent<HTMLButtonElement
             navId="downloadify-quest-reward-preview"
             onClose={ContextMenuApi.closeContextMenu}
             aria-label="Quest Reward Preview"
+            contextMenuAPIArguments={[{ asset }]}
         >
             <Menu.MenuItem
                 id="downloadify-quest-reward-preview"
@@ -2392,6 +2455,7 @@ export function EmojiProfileContextMenu(event: React.MouseEvent<HTMLButtonElemen
             navId="downloadify-emoji"
             onClose={ContextMenuApi.closeContextMenu}
             aria-label="Emoji"
+            contextMenuAPIArguments={[props]}
         >
             <Menu.MenuItem
                 id="downloadify-emoji"
@@ -2446,6 +2510,7 @@ export function ConnectionIconProfileContextMenu(event: React.MouseEvent<HTMLBut
             navId="downloadify-connection-icon"
             onClose={ContextMenuApi.closeContextMenu}
             aria-label="Connection Icon"
+            contextMenuAPIArguments={[props]}
         >
             {[...profileConnections.map(account => {
                 return <Menu.MenuItem
@@ -2489,6 +2554,7 @@ export function ConnectionExtrasProfileContextMenu(event: React.MouseEvent<HTMLB
             navId="downloadify-connection-extras-icon"
             onClose={ContextMenuApi.closeContextMenu}
             aria-label="Connection Extras Icon"
+            contextMenuAPIArguments={[props]}
         >
             <Menu.MenuItem
                 id={`downloadify-${iconNameCleaned ? `${iconNameCleaned}-` : ""}account-connection`}
@@ -2576,6 +2642,7 @@ export function RoleIconMessageContextMenu(event: React.MouseEvent<HTMLButtonEle
             navId="downloadify-role-icon"
             onClose={ContextMenuApi.closeContextMenu}
             aria-label="Role Icon"
+            contextMenuAPIArguments={[props]}
         >
             <Menu.MenuItem
                 id="downloadify-role-icon"
@@ -2614,6 +2681,7 @@ export function ProfileBadgeContextMenu(event: React.MouseEvent<HTMLButtonElemen
             navId="downloadify-profile-badge"
             onClose={ContextMenuApi.closeContextMenu}
             aria-label="Profile Badge"
+            contextMenuAPIArguments={[props]}
         >
             {!!(isCustomBadge && badge.description) && (
                 <Menu.MenuItem
@@ -2679,6 +2747,7 @@ export function ClanBadgeMessageContextMenu(event: React.MouseEvent<HTMLButtonEl
             navId="downloadify-clan-badge"
             onClose={ContextMenuApi.closeContextMenu}
             aria-label="Clan Badge"
+            contextMenuAPIArguments={[props]}
         >
             <Menu.MenuItem
                 id="downloadify-clan-badge"
@@ -3300,9 +3369,10 @@ export function SVGIconContextMenu(event: React.MouseEvent<HTMLButtonElement>, n
 
     return ContextMenuApi.openContextMenu(event, () => {
         return <Menu.Menu
-            navId={`downloadify-${name.toLowerCase()}-icon`}
+            navId={"downloadify-svg-icon"}
             onClose={ContextMenuApi.closeContextMenu}
             aria-label={`${name} Icon`}
+            contextMenuAPIArguments={[{ name }]}
         >
             <Menu.MenuItem
                 id={`downloadify-${name.toLowerCase()}-icon`}

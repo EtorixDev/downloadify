@@ -363,7 +363,7 @@ export interface Quest {
             questBarHero: string | null;
             questBarHeroVideo: string | null;
         };
-        rewardsConfig: {
+        rewardsConfig?: {
             rewards: {
                 skuId?: string;
                 asset?: string;
@@ -372,6 +372,13 @@ export interface Quest {
                 };
             }[];
         },
+        rewards?: {
+            skuId?: string;
+            asset?: string;
+            messages: {
+                name: string;
+            };
+        }[];
         videoMetadata?: {
             assets: {
                 videoPlayerVideo: string | null;

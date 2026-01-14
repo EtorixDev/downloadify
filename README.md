@@ -2,26 +2,24 @@
 
 Download various assets directly in Discord without having to open a browser or dig through HTML.
 
-Available natively in [Equicord](https://github.com/Equicord/Equicord), a Vencord fork, or as a userplugin (you're here!) in [Vencord](https://github.com/Vendicated/Vencord/).
+~~Available natively in [Equicord](https://github.com/Equicord/Equicord), a Vencord fork~~, or as a userplugin (you're here!) in [Vencord](https://github.com/Vendicated/Vencord/).
 
 ## Features
-1. Download all files directly inside of Discord.
+1. Download attachments and various client assets directly inside of Discord.
     - Allow or disallow unicode characters in file names.
-    - Various image assets are available in multiple formats as Discord makes converted copies.
+    - Some assets are available in multiple formats as Discord makes converted copies.
 2. Show a notification when downloads start and finish with a customizable duration.
-3. Add a download button to voice messages.
-4. Set a default directory or pick each time.
+3. Set a default directory or pick each time.
 
 ## TODO
-A few things not yet implemented.
-#### High Priority
-1. Current activity assets, both on their own and as part of the `user-context` menu.
-2. Various SVGs, AutoMod icon, profile icons, new user icon, shop wishlist heart etc.
-3. Claimed Quests context menu.
-#### Low Priority
-4. Game Collection / Profile Widget / Profile Board.
-5. Improve default file names across handlers.
-6. Shop Extras:
-    - Game-Shops such as: https://canary.discord.com/channels/1193841000108531764/game-shop
-    - Nitro orbs exclusive
-7. Sponsored Quest banner.
+1. ~~Add context menu to active and claimed quest tiles.~~
+2. Add download to user-context for Non-Game Activity AND Game Preview Activity.
+3. Add download to content-inventory-context for Non-Game Activity AND Game Preview Activity.
+4. Add download to game-profile-context for Full Game Profile.
+5. Add downloads to user-profile-widget-context-menu for Full Game Profile.
+6. Various SVG handlers: e.g. AutoMod icon, profile icons, new user icon, shop wishlist heart etc.
+7. Nitro Orbs exclusive shop handler.
+8. Expanded shop item handler.
+9. Game-Shops: e.g. https://canary.discord.com/channels/1193841000108531764/game-shop
+10. Sponsored Quest banner handler.
+11. Improve default file names across handlers.

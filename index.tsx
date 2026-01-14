@@ -11,7 +11,7 @@ import { RestAPI } from "@webpack/common";
 
 import { settings } from "./settings";
 import { Collectible, ProfileEffect } from "./utils/definitions";
-import { ChannelContextMenu, ClanBadgeMessageContextMenu, ConnectionExtrasProfileContextMenu, ConnectionIconProfileContextMenu, EmojiProfileContextMenu, ExpressionPickerContextMenu, GDMContextMenu, GuildContextMenu, handleExpandedModalDownloadButtonClicked, handleHoverDownloadButtonClicked, MessageContextMenu, OrbsPopoutShopImageContextMenu, ProfileBadgeContextMenu, QuestRewardContextMenu, QuestTileContextMenu, RoleIconMessageContextMenu, RoleIconProfileContextMenu, ShopCategoryHeaderContextMenu, ShopListingContextMenu, SVGIconContextMenu, UserContextMenu, VoiceMessageDownloadButton } from "./utils/handlers";
+import { ActiveQuestContextMenu, ChannelContextMenu, ClaimedQuestContextMenu, ClanBadgeMessageContextMenu, ConnectionExtrasProfileContextMenu, ConnectionIconProfileContextMenu, EmojiProfileContextMenu, ExpressionPickerContextMenu, GDMContextMenu, GuildContextMenu, handleExpandedModalDownloadButtonClicked, handleHoverDownloadButtonClicked, MessageContextMenu, OrbsPopoutShopImageContextMenu, ProfileBadgeContextMenu, QuestRewardContextMenu, QuestTileContextMenu, RoleIconMessageContextMenu, RoleIconProfileContextMenu, ShopCategoryHeaderContextMenu, ShopListingContextMenu, SVGIconContextMenu, UserContextMenu, VoiceMessageDownloadButton } from "./utils/handlers";
 import { sanitizeCollectible } from "./utils/misc";
 import { CollectiblesCategoryStore, CollectiblesData } from "./utils/nonative";
 
@@ -24,9 +24,11 @@ export default definePlugin({
 
     CollectiblesData,
     SVGIconContextMenu,
+    ActiveQuestContextMenu,
     ShopListingContextMenu,
     EmojiProfileContextMenu,
     ProfileBadgeContextMenu,
+    ClaimedQuestContextMenu,
     CollectiblesCategoryStore,
     RoleIconMessageContextMenu,
     VoiceMessageDownloadButton,
@@ -52,6 +54,23 @@ export default definePlugin({
     },
 
     patches: [
+        {
+            // Adds a shortcut to open the active Quest context
+            // menu, avoiding the need to click the three dots.
+            find: "id:\"quest-tile-\".concat",
+            replacement: {
+                match: /(?=ref:\i=>{)/,
+                replace: "onContextMenu:(event)=>{$self.ActiveQuestContextMenu(event,arguments[0])},"
+            }
+        },
+        {
+            // Adds a context menu to claimed Quest tiles.
+            find: ",{avatarDecorationOverride:",
+            replacement: {
+                match: /(?<=ref:\i,)(tabIndex)/,
+                replace: "onContextMenu:(event)=>{$self.ClaimedQuestContextMenu(event,arguments[0])},$1"
+            }
+        },
         {
             // Adds a context menu to shop listings.
             find: "productName)})",

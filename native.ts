@@ -22,7 +22,18 @@ export async function setDownloadDirectory(): Promise<void> {
         properties: ["openDirectory"]
     });
 
-    result.filePaths[0] && (NativeSettings.store.plugins.Downloadify.defaultDirectory = result.filePaths[0]);
+    if (result.canceled || !result.filePaths.length) {
+        throw new Error("No directory selected.");
+    }
+
+    const selectedPath = result.filePaths[0];
+    const pathAccessible = await fileExists(selectedPath);
+
+    if (!pathAccessible) {
+        throw new Error("Selected directory is not accessible.");
+    }
+
+    NativeSettings.store.plugins.Downloadify.defaultDirectory = selectedPath;
 }
 
 /** Clear the saved default download directory. */
@@ -80,7 +91,7 @@ async function downloadURL(url: string, filePath: string): Promise<boolean> {
     }
 
     const readableStream = Readable.fromWeb(response.body as any);
-    const fileWriteStream = fs.createWriteStream(filePath);
+    const fileWriteStream = fs.createWriteStream(filePath, { flags: "wx" });
     readableStream.pipe(fileWriteStream);
     await finished(fileWriteStream);
 
