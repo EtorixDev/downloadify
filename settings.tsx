@@ -37,12 +37,12 @@ function DefaultDirectorySetting(): JSX.Element {
             setErrorMessage(null);
             setDialogueOpen(true);
             const error = await DownloadifyNative.setDownloadDirectory();
-            DownloadifyLogger.log(`[${getFormattedNow()}] [SET DOWNLOAD DIRECTORY]`, { error });
 
             if (!!error) {
                 throw new Error(error);
             } else {
                 const newDir = await DownloadifyNative.getDownloadDirectory();
+                DownloadifyLogger.log(`[${getFormattedNow()}] [SET DOWNLOAD DIRECTORY]`, newDir);
                 setDefaultDirectory(newDir);
             }
         } catch (error: any) {
