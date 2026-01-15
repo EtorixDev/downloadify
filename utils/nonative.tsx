@@ -21,9 +21,11 @@ export const defaultAssets = findByPropsLazy("DEFAULT_GROUP_DM_AVATARS") as Defa
 export const DownloadifyLogger = new Logger("Downloadify");
 export const emojiData = findLazy(m => m.emojis && Array.isArray(m.emojis));
 export const ApplicationStore = findStoreLazy("ApplicationStore");
+export const DetectableGameSupplementalStore = findStoreLazy("DetectableGameSupplementalStore");
 export const ProfileEffectStore = findStoreLazy("ProfileEffectStore");
 export const InviteStore = findStoreLazy("InviteStore");
 export const CollectiblesCategoryStore = findStoreLazy("CollectiblesCategoryStore");
+export const ApplicationStreamPreviewStore = findStoreLazy("ApplicationStreamPreviewStore");
 const connectionData = findLazy(m => m.getByUrl && m.isSupported);
 
 export const getConnection = (connection: string): null | ExternalConnection => {

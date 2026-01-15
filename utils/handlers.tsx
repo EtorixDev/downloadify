@@ -7,14 +7,14 @@
 import { ImageIcon } from "@components/index";
 import { copyWithToast } from "@utils/index";
 import { ConnectedAccount } from "@vencord/discord-types";
-import { StickerFormatType } from "@vencord/discord-types/enums";
-import { ContextMenuApi, GuildMemberStore, GuildRoleStore, GuildStore, Menu, PresenceStore, SelectedGuildStore, showToast, StickersStore, Toasts, UserProfileStore, UserStore } from "@webpack/common";
+import { ActivityType, StickerFormatType } from "@vencord/discord-types/enums";
+import { ChannelStore, ContextMenuApi, GuildMemberStore, GuildRoleStore, GuildStore, Menu, PresenceStore, SelectedGuildStore, showToast, StickersStore, Toasts, UserProfileStore, UserStore, VoiceStateStore } from "@webpack/common";
 import { JSX } from "react";
 
 import { settings } from "../settings";
-import { ASSET_MEDIA_PROXY_BASE, AssetInfo, AssetSource, AssetType, AttachmentFlags, AvatarDecoration, BadgeNames, CDN_BASE, ChannelContextMenuProps, ClanBadgeMessageContextMenuProps, CollectibleType, ConnectionExtrasProfileContextMenuProps, ConnectionIconProfileContextMenuProps, DownloadifyMember, DownloadifyUser, DownloadifyUserProfile, EmojiContextMenuProps, ExpandedModalDownloadProps, ExtractedEmoji, ExtractedEmojis, GDMContextMenuProps, GuildContextMenuProps, HoverDownloadProps, InviteData, MessageContextMenuProps, Nameplate, ORBS_REWARD_PNG, ORBS_REWARD_WEBM, ORBS_SKU_ID, OrbsPopoutShopImageContextMenuProps, PRIMARY_DOMAIN_BASE, ProfileBadgeContextMenuProps, ProfileEffect, QuestTileContextMenuProps, RoleIconMessageContextMenuProps, RoleIconProfileContextMenuProps, ShopCategoryHeaderContextMenuProps, ShopListingContextMenuProps, UserContextMenuProps, VoiceMessageDownloadButtonProps } from "./definitions";
-import { fileThreshold, getFormattedNow, parseURL, sanitizeFilename, SVG2URL } from "./misc";
-import { ApplicationStore, CollectiblesData, d, defaultAssets, DownloadIcon, DownloadifyLogger, DownloadifyNative, extractEmojis, getConnection, getUnicodeEmojiData, getUnicodeEmojiPath, ImageAsIcon, InviteStore, joinOrCreateContextMenuGroup } from "./nonative";
+import { ASSET_MEDIA_PROXY_BASE, AssetInfo, AssetSource, AssetType, AttachmentFlags, AvatarDecoration, BadgeNames, CDN_BASE, ChannelContextMenuProps, ClanBadgeMessageContextMenuProps, CollectibleType, ConnectionExtrasProfileContextMenuProps, ConnectionIconProfileContextMenuProps, DownloadifyMember, DownloadifyUser, DownloadifyUserProfile, EmojiContextMenuProps, ExpandedModalDownloadProps, ExtractedEmoji, ExtractedEmojis, GDMContextMenuProps, GuildContextMenuProps, HoverDownloadProps, InviteData, MessageContextMenuProps, Nameplate, ORBS_REWARD_PNG, ORBS_REWARD_WEBM, ORBS_SKU_ID, OrbsPopoutShopImageContextMenuProps, PRIMARY_DOMAIN_BASE, ProfileBadgeContextMenuProps, ProfileEffect, QuestTileContextMenuProps, RoleIconMessageContextMenuProps, RoleIconProfileContextMenuProps, ShopCategoryHeaderContextMenuProps, ShopListingContextMenuProps, UserActivityContextMenuProps, UserContextMenuProps, VoiceMessageDownloadButtonProps } from "./definitions";
+import { activityAssetStringToURL, fileThreshold, getFormattedNow, parseURL, sanitizeFilename, SVG2URL } from "./misc";
+import { ApplicationStore, ApplicationStreamPreviewStore, CollectiblesData, d, defaultAssets, DetectableGameSupplementalStore, DownloadIcon, DownloadifyLogger, DownloadifyNative, extractEmojis, getConnection, getUnicodeEmojiData, getUnicodeEmojiPath, ImageAsIcon, InviteStore, joinOrCreateContextMenuGroup } from "./nonative";
 
 function getEmojiMenuItem(emoji: ExtractedEmoji, isTargeted: boolean = false, isSubmenuItem: boolean = false) {
     const isUnicodeEmoji = !(emoji as any).id;
@@ -1069,7 +1069,7 @@ export async function ClaimedQuestContextMenu(event: React.MouseEvent<HTMLButton
         return <Menu.Menu
             navId="downloadify-claimed-quest-context-menu"
             onClose={ContextMenuApi.closeContextMenu}
-            aria-label="Claimed Quest Menu"
+            aria-label="Claimed Quest"
             contextMenuAPIArguments={[props]}
         >
             {children}
@@ -1098,7 +1098,7 @@ export function ActiveQuestContextMenu(event: React.MouseEvent<HTMLDivElement>, 
         return <Menu.Menu
             navId="downloadify-active-quest-context-menu"
             onClose={ContextMenuApi.closeContextMenu}
-            aria-label="Active Quest Menu"
+            aria-label="Active Quest"
             contextMenuAPIArguments={[props]}
         >
             {children}
@@ -2767,6 +2767,171 @@ export function ClanBadgeMessageContextMenu(event: React.MouseEvent<HTMLButtonEl
     });
 }
 
+export function UserActivityContextMenu(children: Array<any>, props: UserActivityContextMenuProps): void {
+    const { activity, entry, user } = props;
+
+    if (!children?.length || !user?.id || (!activity && !entry)) {
+        return;
+    }
+
+    const entryAppId = entry?.extra.application_id;
+    const activityAppId = activity?.application_id;
+    const appId = entryAppId || activityAppId;
+    const application = entryAppId ? ApplicationStore.getApplication(entryAppId) : ApplicationStore.getApplicationByName(activity?.name) ?? ApplicationStore.getApplication(activityAppId);
+    const isGame = application && DetectableGameSupplementalStore.getGame(application.id);
+
+    const musicCover = entry?.extra.entries?.[0]?.media?.image_url;
+    const musicTitle = entry?.extra.entries?.[0]?.media?.title;
+
+    const largeImage = musicCover ?? (activity?.assets?.large_image ? activityAssetStringToURL(activity.assets.large_image, activity.id) : null);
+    const smallImage = activity?.assets?.small_image ? activityAssetStringToURL(activity.assets.small_image, activity.id) : null;
+    const inviteCoverImage = (activity?.assets as any)?.invite_cover_image ? activityAssetStringToURL((activity.assets as any).invite_cover_image, activity.id) : null;
+
+    const applicationIconHash = (isGame || application?.type) ? application?.icon || null : null;
+    const applicationIcon = !applicationIconHash ? null : `${ASSET_MEDIA_PROXY_BASE.origin}/app-icons/${application.id}/${applicationIconHash}.png`;
+    const applicationCoverHash = (isGame || application?.type) ? application?.coverImage || null : null;
+    const applicationCover = !applicationCoverHash ? null : `${ASSET_MEDIA_PROXY_BASE.origin}/app-icons/${application.id}/${applicationCoverHash}.png`;
+
+    const name = entry?.extra?.game_name || activity?.name || musicTitle || "Activity";
+    const activityNameCleaned = sanitizeFilename(name, {});
+    const activityItems: any[] = [];
+
+    if (largeImage) {
+        activityItems.push(
+            <Menu.MenuItem
+                key={`downloadify-${appId}-large-image-asset`}
+                id={`downloadify-${appId}-large-image-asset`}
+                label={`Download ${name} Large Image`}
+                submenuItemLabel={`${name} Large Image`}
+                icon={() => ImageIcon({ width: 20, height: 20 })}
+                action={async () => await handleDownload({
+                    alias: `${user.username.replace(".", "-")}-${activityNameCleaned}-large-image-asset`,
+                    animatable: false,
+                    urls: { primary: largeImage },
+                    mime: null,
+                    classifier: null,
+                    size: null
+                })}
+            />
+        );
+    }
+
+    if (smallImage) {
+        activityItems.push(
+            <Menu.MenuItem
+                key={`downloadify-${appId}-small-image-asset`}
+                id={`downloadify-${appId}-small-image-asset`}
+                label={`Download ${name} Small Image`}
+                submenuItemLabel={`${name} Small Image`}
+                icon={() => ImageIcon({ width: 20, height: 20 })}
+                action={async () => await handleDownload({
+                    alias: `${user.username.replace(".", "-")}-${activityNameCleaned}-small-image-asset`,
+                    animatable: false,
+                    urls: { primary: smallImage },
+                    mime: null,
+                    classifier: null,
+                    size: null
+                })}
+            />
+        );
+    }
+
+    if (inviteCoverImage) {
+        activityItems.push(
+            <Menu.MenuItem
+                key={`downloadify-${appId}-invite-cover-image-asset`}
+                id={`downloadify-${appId}-invite-cover-image-asset`}
+                label={`Download ${name} Invite Cover Image`}
+                submenuItemLabel={`${name} Invite Cover Image`}
+                icon={() => ImageIcon({ width: 20, height: 20 })}
+                action={async () => await handleDownload({
+                    alias: `${user.username.replace(".", "-")}-${activityNameCleaned}-invite-cover-image-asset`,
+                    animatable: false,
+                    urls: { primary: inviteCoverImage },
+                    mime: null,
+                    classifier: null,
+                    size: null
+                })}
+            />
+        );
+    }
+
+    if (applicationIcon) {
+        activityItems.push(
+            <Menu.MenuItem
+                key={`downloadify-${appId}-application-icon-asset`}
+                id={`downloadify-${appId}-application-icon-asset`}
+                label={`Download ${name} Application Icon`}
+                submenuItemLabel={`${name} Application Icon`}
+                icon={() => ImageAsIcon({ src: applicationIcon!, width: 20, height: 20 })}
+                action={async () => await handleDownload({
+                    alias: `${user.username.replace(".", "-")}-${activityNameCleaned}-application-icon-asset`,
+                    animatable: false,
+                    urls: { primary: applicationIcon },
+                    mime: null,
+                    classifier: null,
+                    size: null
+                })}
+            />
+        );
+    }
+
+    if (applicationCover) {
+        activityItems.push(
+            <Menu.MenuItem
+                key={`downloadify-${appId}-application-cover-icon-asset`}
+                id={`downloadify-${appId}-application-cover-icon-asset`}
+                label={`Download ${name} Application Cover Icon`}
+                submenuItemLabel={`${name} Application Cover Icon`}
+                icon={() => ImageAsIcon({ src: applicationCover + "?keep_aspect_ratio=false", width: 20, height: 20 })}
+                action={async () => await handleDownload({
+                    alias: `${user.username.replace(".", "-")}-${activityNameCleaned}-application-cover-icon-asset`,
+                    animatable: false,
+                    urls: { primary: applicationCover },
+                    mime: null,
+                    classifier: null,
+                    size: null,
+                    extra: { truncate: true }
+                })}
+            />
+        );
+    }
+
+    if (applicationCover) {
+        activityItems.push(
+            <Menu.MenuItem
+                key={`downloadify-${appId}-application-cover-asset`}
+                id={`downloadify-${appId}-application-cover-asset`}
+                label={`Download ${name} Application Cover Image`}
+                submenuItemLabel={`${name} Application Cover Image`}
+                icon={() => ImageIcon({ width: 20, height: 20 })}
+                action={async () => await handleDownload({
+                    alias: `${user.username.replace(".", "-")}-${activityNameCleaned}-application-cover-asset`,
+                    animatable: false,
+                    urls: { primary: applicationCover },
+                    mime: null,
+                    classifier: null,
+                    size: null,
+                    extra: { truncate: false }
+                })}
+            />
+        );
+    }
+
+    if (!activityItems.length) {
+        return;
+    }
+
+    joinOrCreateContextMenuGroup(
+        children,
+        activityItems,
+        "user-activity-asset-group",
+        "downloadify-submenu",
+        "Download Activity Assets",
+        []
+    );
+}
+
 export function UserContextMenu(children: Array<any>, props: UserContextMenuProps): void {
     if (!children?.length || !props.user?.id) {
         return;
@@ -2774,7 +2939,7 @@ export function UserContextMenu(children: Array<any>, props: UserContextMenuProp
 
     DownloadifyLogger.info(`[${getFormattedNow()}] [USER CONTEXT MENU OPENED]\n`, props);
 
-    const user = UserStore.getUser(props.user.id) as DownloadifyUser;
+    const user = props.user as DownloadifyUser;
     const userProfile = UserProfileStore.getUserProfile(user.id) as DownloadifyUserProfile | null;
     const guild = props.guildId ? GuildStore.getGuild(props.guildId) : null;
     const member = (guild ? GuildMemberStore.getMember(guild.id, props.user.id) : null) as DownloadifyMember | null;
@@ -2832,8 +2997,31 @@ export function UserContextMenu(children: Array<any>, props: UserContextMenuProp
     const clanBadgeTextCleaned = !hasClanBade ? null : clanBadgeText.match(/[^a-z]/gi) ? null : clanBadgeText;
 
     const activities = PresenceStore.getActivities(user.id);
-    const customStatus = activities.find(activity => activity.id === "custom");
+    const customStatus = activities.find(activity => activity.type === ActivityType.CUSTOM_STATUS);
     const customStatusEmoji = customStatus?.emoji;
+    const nonCustomActivities = activities.filter(activity => activity.type !== ActivityType.CUSTOM_STATUS).map(activity => {
+        const largeImage = activity.assets?.large_image ? activityAssetStringToURL(activity.assets.large_image, activity.application_id) : null;
+        const smallImage = activity.assets?.small_image ? activityAssetStringToURL(activity.assets.small_image, activity.application_id) : null;
+        const inviteCoverImage = (activity.assets as any)?.invite_cover_image ? activityAssetStringToURL((activity.assets as any).invite_cover_image, activity.application_id) : null;
+        const application = !activity.application_id ? null : ApplicationStore.getApplication(activity.application_id);
+        const applicationIconHash = !application?.type ? null : application?.icon || null;
+        const applicationIconURL = !applicationIconHash ? null : `${ASSET_MEDIA_PROXY_BASE.origin}/app-icons/${activity.application_id}/${applicationIconHash}.png`;
+        const applicationCoverHash = !application?.type ? null : application?.coverImage || null;
+        const applicationCoverURL = !applicationCoverHash ? null : `${ASSET_MEDIA_PROXY_BASE.origin}/app-icons/${activity.application_id}/${applicationCoverHash}.png`;
+
+        return largeImage || smallImage || inviteCoverImage || applicationIconURL || applicationCoverURL ? {
+            ...activity,
+            largeImageURL: largeImage,
+            smallImageURL: smallImage,
+            inviteCoverImageURL: inviteCoverImage,
+            applicationIconURL: applicationIconURL,
+            applicationCoverURL: applicationCoverURL
+        } : null;
+    }).filter(activity => activity !== null);
+
+    const userVoiceState = VoiceStateStore.getVoiceStateForUser(user.id);
+    const userVoiceGuild = !userVoiceState ? null : ChannelStore.getChannel(userVoiceState.channelId!).guild_id;
+    const streamPreview = !userVoiceState ? null : ApplicationStreamPreviewStore.getPreviewURL(userVoiceGuild, userVoiceState.channelId!, user.id);
 
     const iconRoleID = member?.iconRoleId;
     const roleWithIcon = !iconRoleID ? null : GuildRoleStore.getRole(guild!.id, iconRoleID);
@@ -3003,6 +3191,152 @@ export function UserContextMenu(children: Array<any>, props: UserContextMenuProp
                 })}
             />
         ) : null,
+        nonCustomActivities.length >= 1 ? (
+            <Menu.MenuItem
+                id="downloadify-activity-assets"
+                label="Download Activity Assets"
+                submenuItemLabel="Activity Assets"
+            >
+                {[...nonCustomActivities.map(activity => {
+                    const activityNameCleaned = sanitizeFilename(activity!.name || `activity-${activity!.id}`, {});
+                    const activityItems: any[] = [];
+
+                    if (activity!.largeImageURL) {
+                        activityItems.push(
+                            <Menu.MenuItem
+                                key={`downloadify-${activity!.id}-large-image-asset`}
+                                id={`downloadify-${activity!.id}-large-image-asset`}
+                                label={`${activity!.name || "Activity"} Large Image`}
+                                icon={() => ImageIcon({ width: 20, height: 20 })}
+                                action={async () => await handleDownload({
+                                    alias: `${user.username.replace(".", "-")}-${activityNameCleaned}-large-image-asset`,
+                                    animatable: false,
+                                    urls: { primary: activity!.largeImageURL! },
+                                    mime: null,
+                                    classifier: null,
+                                    size: null
+                                })}
+                            />
+                        );
+                    }
+
+                    if (activity!.smallImageURL) {
+                        activityItems.push(
+                            <Menu.MenuItem
+                                key={`downloadify-${activity!.id}-small-image-asset`}
+                                id={`downloadify-${activity!.id}-small-image-asset`}
+                                label={`${activity!.name || "Activity"} Small Image`}
+                                icon={() => ImageIcon({ width: 20, height: 20 })}
+                                action={async () => await handleDownload({
+                                    alias: `${user.username.replace(".", "-")}-${activityNameCleaned}-small-image-asset`,
+                                    animatable: false,
+                                    urls: { primary: activity!.smallImageURL! },
+                                    mime: null,
+                                    classifier: null,
+                                    size: null
+                                })}
+                            />
+                        );
+                    }
+
+                    if (activity!.inviteCoverImageURL) {
+                        activityItems.push(
+                            <Menu.MenuItem
+                                key={`downloadify-${activity!.id}-invite-cover-image-asset`}
+                                id={`downloadify-${activity!.id}-invite-cover-image-asset`}
+                                label={`${activity!.name || "Activity"} Invite Cover Image`}
+                                icon={() => ImageIcon({ width: 20, height: 20 })}
+                                action={async () => await handleDownload({
+                                    alias: `${user.username.replace(".", "-")}-${activityNameCleaned}-invite-cover-image-asset`,
+                                    animatable: false,
+                                    urls: { primary: activity!.inviteCoverImageURL! },
+                                    mime: null,
+                                    classifier: null,
+                                    size: null
+                                })}
+                            />
+                        );
+                    }
+
+                    if (activity!.applicationIconURL) {
+                        activityItems.push(
+                            <Menu.MenuItem
+                                key={`downloadify-${activity!.id}-application-icon-asset`}
+                                id={`downloadify-${activity!.id}-application-icon-asset`}
+                                label={`${activity!.name || "Activity"} Application Icon`}
+                                icon={() => ImageAsIcon({ src: activity!.applicationIconURL!, width: 20, height: 20 })}
+                                action={async () => await handleDownload({
+                                    alias: `${user.username.replace(".", "-")}-${activityNameCleaned}-application-icon-asset`,
+                                    animatable: false,
+                                    urls: { primary: activity!.applicationIconURL! },
+                                    mime: null,
+                                    classifier: null,
+                                    size: null
+                                })}
+                            />
+                        );
+                    }
+
+                    if (activity!.applicationCoverURL) {
+                        activityItems.push(
+                            <Menu.MenuItem
+                                key={`downloadify-${activity!.id}-application-cover-icon-asset`}
+                                id={`downloadify-${activity!.id}-application-cover-icon-asset`}
+                                label={`${activity!.name || "Activity"} Application Cover Icon`}
+                                icon={() => ImageAsIcon({ src: activity!.applicationCoverURL! + "?keep_aspect_ratio=false", width: 20, height: 20 })}
+                                action={async () => await handleDownload({
+                                    alias: `${user.username.replace(".", "-")}-${activityNameCleaned}-application-cover-icon-asset`,
+                                    animatable: false,
+                                    urls: { primary: activity!.applicationCoverURL! },
+                                    mime: null,
+                                    classifier: null,
+                                    size: null,
+                                    extra: { truncate: true }
+                                })}
+                            />
+                        );
+                    }
+
+                    if (activity!.applicationCoverURL) {
+                        activityItems.push(
+                            <Menu.MenuItem
+                                key={`downloadify-${activity!.id}-application-cover-asset`}
+                                id={`downloadify-${activity!.id}-application-cover-asset`}
+                                label={`${activity!.name || "Activity"} Application Cover Image`}
+                                icon={() => ImageIcon({ width: 20, height: 20 })}
+                                action={async () => await handleDownload({
+                                    alias: `${user.username.replace(".", "-")}-${activityNameCleaned}-application-cover-asset`,
+                                    animatable: false,
+                                    urls: { primary: activity!.applicationCoverURL! },
+                                    mime: null,
+                                    classifier: null,
+                                    size: null,
+                                    extra: { truncate: false }
+                                })}
+                            />
+                        );
+                    }
+
+                    return activityItems;
+                })]}
+            </Menu.MenuItem>
+        ) : null,
+        streamPreview ? (
+            <Menu.MenuItem
+                id="downloadify-stream-preview"
+                label="Download Stream Preview"
+                submenuItemLabel="Stream Preview"
+                icon={() => ImageIcon({ width: 20, height: 20 })}
+                action={async () => await handleDownload({
+                    alias: `${user.username.replace(".", "-")}-stream-preview`,
+                    animatable: false,
+                    urls: { primary: streamPreview },
+                    mime: null,
+                    classifier: null,
+                    size: null
+                })}
+            />
+        ) : null,
         defaultUserAvatarURL ? (
             <Menu.MenuItem
                 id="downloadify-default-user-avatar"
@@ -3019,7 +3353,7 @@ export function UserContextMenu(children: Array<any>, props: UserContextMenuProp
                 })}
             />
         ) : null,
-        (profileConnections.length || profileBadges.length || clanBadgeURL || customStatusEmojiURL || defaultUserAvatarURL) && (userAvatarURL || userBannerURL || userAvatarDecorationURL || userNameplateURL || userProfileEffect || userBioEmojis)
+        (profileConnections.length || profileBadges.length || clanBadgeURL || customStatusEmojiURL || nonCustomActivities.length || streamPreview || defaultUserAvatarURL) && (userAvatarURL || userBannerURL || userAvatarDecorationURL || userNameplateURL || userProfileEffect || userBioEmojis)
             ? <Menu.MenuSeparator /> : null,
         userAvatarURL ? (
             <Menu.MenuItem
@@ -3264,6 +3598,10 @@ export function UserContextMenu(children: Array<any>, props: UserContextMenuProp
         ) : null,
         memberBioEmojis ? getEmojiSubmenu(memberBioEmojis, "member-bio", false, "Member Bio Emojis") : null
     ].filter(Boolean);
+
+    if (!downloadifyItems.length) {
+        return;
+    }
 
     joinOrCreateContextMenuGroup(
         children,

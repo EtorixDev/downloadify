@@ -91,7 +91,7 @@ async function downloadURL(url: string, filePath: string): Promise<boolean> {
     }
 
     const readableStream = Readable.fromWeb(response.body as any);
-    const fileWriteStream = fs.createWriteStream(filePath, { flags: "wx" });
+    const fileWriteStream = fs.createWriteStream(filePath);
     readableStream.pipe(fileWriteStream);
     await finished(fileWriteStream);
 
@@ -125,7 +125,7 @@ function buildDiscordURL(
         const resolvedExt = ext.replace("apng", "png").replace("awebp", "webp");
         let baseURL: string | undefined;
 
-        if ([AssetSource.ASSET_MEDIA_PROXY, AssetSource.ATTACHMENT_MEDIA_PROXY, AssetSource.EXTERNAL_IMAGE_PROXY].includes(url.source)) {
+        if ([AssetSource.ASSET_MEDIA_PROXY, AssetSource.ATTACHMENT_MEDIA_PROXY, AssetSource.EXTERNAL_IMAGE_PROXY, AssetSource.EXTERNAL_ASSET_PROXY].includes(url.source)) {
             const isVideo = ["video/mp4", "video/webm"].includes(asset.mime ?? "");
 
             if (url.source === AssetSource.ASSET_MEDIA_PROXY && !isVideo) {
@@ -141,7 +141,7 @@ function buildDiscordURL(
                 newURL.searchParams.append(key, value);
             });
 
-            if (isVideo || [AssetSource.ATTACHMENT_MEDIA_PROXY, AssetSource.EXTERNAL_IMAGE_PROXY].includes(url.source)) {
+            if (isVideo || [AssetSource.ATTACHMENT_MEDIA_PROXY, AssetSource.EXTERNAL_IMAGE_PROXY, AssetSource.EXTERNAL_ASSET_PROXY].includes(url.source)) {
                 // Attachments on the media proxy and the external image proxy use the format query
                 // parameter to retrieve alternate formats instead of changing the file extension
                 // directly like assets on the media proxy do as seen above. Videos files also
@@ -151,10 +151,14 @@ function buildDiscordURL(
                 }
             }
 
-            if (url.source !== AssetSource.ATTACHMENT_MEDIA_PROXY) {
-                // Attachments on the media proxy do not support resizing but assets
-                // on the media proxy do, and the external image proxy does as well.
+            if (![AssetSource.ATTACHMENT_MEDIA_PROXY, AssetSource.EXTERNAL_ASSET_PROXY].includes(url.source)) {
+                // Attachments and external images on the media proxy do not support resizing
+                // but assets on the media proxy do, and the external image proxy does as well.
                 newURL.searchParams.append("size", "4096");
+            }
+
+            if (asset.classifier === AssetType.APPLICATION_ASSET && asset.extra?.truncate !== undefined) {
+                newURL.searchParams.append("keep_aspect_ratio", asset.extra.truncate ? "false" : "true");
             }
 
             if (ext === "awebp" && asset.animatable) {
@@ -238,7 +242,7 @@ export async function download(
 
     const urls: { if: { [ext: string]: string; }, else: string; } = { if: {}, else: parsedPrimaryURL.url.href };
 
-    if ([AssetSource.PRIMARY_DOMAIN, AssetSource.VENCORD, AssetSource.DATA_SVG].includes(parsedPrimaryURL.source)) {
+    if ([AssetSource.PRIMARY_DOMAIN, AssetSource.VENCORD, AssetSource.DATA_SVG, AssetSource.TWITCH, AssetSource.YOUTUBE, AssetSource.SPOTIFY].includes(parsedPrimaryURL.source)) {
         parsedPrimaryURL.extension && (urls.if[parsedPrimaryURL.extension] ??= parsedPrimaryURL.url.href);
     } else if (parsedPrimaryURL.source === AssetSource.ATTACHMENT_MEDIA_PROXY) {
         buildDiscordURL(urls, parsedPrimaryURL, asset);

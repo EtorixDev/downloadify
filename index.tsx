@@ -11,7 +11,7 @@ import { RestAPI } from "@webpack/common";
 
 import { settings } from "./settings";
 import { Collectible, ProfileEffect } from "./utils/definitions";
-import { ActiveQuestContextMenu, ChannelContextMenu, ClaimedQuestContextMenu, ClanBadgeMessageContextMenu, ConnectionExtrasProfileContextMenu, ConnectionIconProfileContextMenu, EmojiProfileContextMenu, ExpressionPickerContextMenu, GDMContextMenu, GuildContextMenu, handleExpandedModalDownloadButtonClicked, handleHoverDownloadButtonClicked, MessageContextMenu, OrbsPopoutShopImageContextMenu, ProfileBadgeContextMenu, QuestRewardContextMenu, QuestTileContextMenu, RoleIconMessageContextMenu, RoleIconProfileContextMenu, ShopCategoryHeaderContextMenu, ShopListingContextMenu, SVGIconContextMenu, UserContextMenu, VoiceMessageDownloadButton } from "./utils/handlers";
+import { ActiveQuestContextMenu, ChannelContextMenu, ClaimedQuestContextMenu, ClanBadgeMessageContextMenu, ConnectionExtrasProfileContextMenu, ConnectionIconProfileContextMenu, EmojiProfileContextMenu, ExpressionPickerContextMenu, GDMContextMenu, GuildContextMenu, handleExpandedModalDownloadButtonClicked, handleHoverDownloadButtonClicked, MessageContextMenu, OrbsPopoutShopImageContextMenu, ProfileBadgeContextMenu, QuestRewardContextMenu, QuestTileContextMenu, RoleIconMessageContextMenu, RoleIconProfileContextMenu, ShopCategoryHeaderContextMenu, ShopListingContextMenu, SVGIconContextMenu, UserActivityContextMenu, UserContextMenu, VoiceMessageDownloadButton } from "./utils/handlers";
 import { sanitizeCollectible } from "./utils/misc";
 import { CollectiblesCategoryStore, CollectiblesData } from "./utils/nonative";
 
@@ -51,6 +51,7 @@ export default definePlugin({
         "thread-context": ChannelContextMenu,
         "quests-entry": QuestTileContextMenu,
         "expression-picker": ExpressionPickerContextMenu,
+        "content-inventory-context": UserActivityContextMenu
     },
 
     patches: [

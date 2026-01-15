@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { Channel, Guild, GuildMember, Message, User, UserProfile } from "@vencord/discord-types";
+import { Activity, Channel, Guild, GuildMember, Message, User, UserProfile } from "@vencord/discord-types";
 
 export const RESERVED_NAMES = ["CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"];
 export const CDN_BASE = new URL("https://cdn.discordapp.com");
@@ -15,6 +15,9 @@ export const IMAGE_EXT_1_DOMAIN_BASE = new URL("https://images-ext-1.discordapp.
 export const IMAGE_EXT_2_DOMAIN_BASE = new URL("https://images-ext-2.discordapp.net");
 export const WIKIMEDIA_DOMAIN_BASE = new URL("https://upload.wikimedia.org");
 export const TWITTER_DOMAIN_BASE = new URL("https://pbs.twimg.com");
+export const TWITCH_THUMBNAIL_BASE = new URL("https://static-cdn.jtvnw.net/previews-ttv");
+export const YOUTUBE_THUMBNAIL_BASE = new URL("https://i.ytimg.com/vi");
+export const SPOTIFY_THUMBNAIL_BASE = new URL("https://i.scdn.co/image");
 export const TENOR_BASE_1 = new URL("https://c.tenor.com");
 export const TENOR_BASE_2 = new URL("https://media.tenor.com");
 export const VENCORD_BASE = new URL("https://vencord.dev");
@@ -64,10 +67,14 @@ export enum AssetSource {
     PRIMARY_DOMAIN = "primary_domain",
     EXTERNAL_IMAGE_PROXY = "external_image_proxy",
     ATTACHMENT_MEDIA_PROXY = "attachment_media_proxy",
+    EXTERNAL_ASSET_PROXY = "external_asset_proxy",
     ASSET_MEDIA_PROXY = "asset_media_proxy",
     CDN = "cdn",
     WIKIMEDIA = "wikimedia",
     TWITTER = "twitter",
+    TWITCH = "twitch",
+    YOUTUBE = "youtube",
+    SPOTIFY = "spotify",
     TENOR = "tenor",
     VENCORD = "vencord",
     DATA_SVG = "data_svg",
@@ -93,6 +100,7 @@ export enum AssetType {
     PROFILE_EFFECT_THUMBNAIL = "profile_effect_thumbnail",
     PROFILE_EFFECT_PRIMARY = "profile_effect_primary",
     PROFILE_EFFECT_SECONDARY = "profile_effect_secondary",
+    APPLICATION_ASSET = "application_asset",
     AVATAR_DECORATION = "avatar_decoration",
     DEFAULT_USER_AVATAR = "default_user_avatar",
     DEFAULT_GROUP_ICON = "default_group_icon",
@@ -172,6 +180,7 @@ export interface AssetInfo {
     mime: string | null | undefined;
     classifier: AssetType | string | null | undefined;
     size: number | null;
+    extra?: { truncate?: boolean; };
 }
 
 export const assetAvailability = {
@@ -190,6 +199,7 @@ export const assetAvailability = {
         [AssetType.PROFILE_EFFECT_SECONDARY]: { animated: ["apng", "png", "webp", "jpg"] },
         [AssetType.PROFILE_EFFECT_THUMBNAIL]: { static: ["png", "webp", "jpg"] },
         [AssetType.LOTTIE_STICKER]: { animated: ["json"] },
+        [AssetType.APPLICATION_ASSET]: { static: ["png", "webp", "jpg"] },
         [AssetType.GENERIC_STATIC]: { static: ["png", "webp", "jpg"] },
         [AssetType.GENERIC_WEBM]: { animated: ["webm", "png", "webp", "jpg"] },
         "video/mp4": { animated: ["mp4", "png", "webp", "jpg"] },
@@ -217,6 +227,9 @@ export const assetAvailability = {
         "video/quicktime": { animated: ["mov", "png", "webp", "jpg"] },
         [AssetType.VOICE_MESSAGE]: { audio: ["ogg"] }
     },
+    [AssetSource.EXTERNAL_ASSET_PROXY]: {
+        [AssetType.GENERIC_STATIC]: { static: ["png", "webp", "jpg"] },
+    },
     [AssetSource.ASSET_MEDIA_PROXY]: {
         [AssetType.USER_AVATAR]: { static: ["png", "webp", "jpg"], animated: ["gif", "awebp", "png", "webp", "jpg"] },
         [AssetType.USER_BANNER]: { static: ["png", "webp", "jpg"], animated: ["gif", "awebp", "png", "webp", "jpg"] },
@@ -231,6 +244,7 @@ export const assetAvailability = {
         [AssetType.AVATAR_DECORATION]: { static: ["png", "webp", "jpg"], animated: ["apng", "png", "webp", "jpg"] },
         [AssetType.CUSTOM_ROLE_ICON]: { static: ["png", "webp", "jpg"], },
         [AssetType.APNG_STICKER]: { static: ["png", "webp", "jpg"], animated: ["apng", "png", "webp", "jpg"] },
+        [AssetType.APPLICATION_ASSET]: { static: ["png", "webp", "jpg"] },
         [AssetType.PNG_STICKER]: { static: ["png", "webp", "jpg"], },
         [AssetType.GIF_STICKER]: { animated: ["gif", "awebp", "png", "webp", "jpg"] },
         "video/mp4": { animated: ["mp4", "png", "webp", "jpg"] },
@@ -485,6 +499,23 @@ export interface GDMContextMenuProps {
 
 export interface GuildContextMenuProps {
     guild: Guild;
+}
+
+export interface UserActivityContextMenuProps {
+    activity: Activity;
+    entry?: {
+        extra: {
+            game_name?: string;
+            application_id?: string;
+            entries?: {
+                media?: {
+                    image_url?: string;
+                    title?: string;
+                };
+            }[];
+        };
+    };
+    user: User;
 }
 
 export interface UserContextMenuProps {

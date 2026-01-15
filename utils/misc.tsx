@@ -4,7 +4,34 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-import { ASSET_MEDIA_PROXY_BASE, ASSET_TYPE_EXTRACTOR, AssetInfo, AssetSource, AssetType, ATTACHMENT_MEDIA_PROXY_BASE, AvatarDecoration, CDN_BASE, Collectible, CollectibleType, EQUICORD_BASE, EQUICORD_IMAGES_BASE, IMAGE_EXT_1_DOMAIN_BASE, IMAGE_EXT_2_DOMAIN_BASE, Nameplate, ParsedFile, ParsedURL, PRIMARY_DOMAIN_BASE, ProfileEffect, RESERVED_NAMES, TENOR_BASE_1, TENOR_BASE_2, TWITTER_DOMAIN_BASE, VENCORD_BADGES_BASE, VENCORD_BASE, WIKIMEDIA_DOMAIN_BASE } from "./definitions";
+import { ASSET_MEDIA_PROXY_BASE, ASSET_TYPE_EXTRACTOR, AssetInfo, AssetSource, AssetType, ATTACHMENT_MEDIA_PROXY_BASE, AvatarDecoration, CDN_BASE, Collectible, CollectibleType, EQUICORD_BASE, EQUICORD_IMAGES_BASE, IMAGE_EXT_1_DOMAIN_BASE, IMAGE_EXT_2_DOMAIN_BASE, Nameplate, ParsedFile, ParsedURL, PRIMARY_DOMAIN_BASE, ProfileEffect, RESERVED_NAMES, SPOTIFY_THUMBNAIL_BASE, TENOR_BASE_1, TENOR_BASE_2, TWITCH_THUMBNAIL_BASE, TWITTER_DOMAIN_BASE, VENCORD_BADGES_BASE, VENCORD_BASE, WIKIMEDIA_DOMAIN_BASE, YOUTUBE_THUMBNAIL_BASE } from "./definitions";
+
+export function activityAssetStringToURL(assetString: string, appId?: string): string | null {
+    const parts = assetString.split(":");
+    const type = parts.length > 1 ? parts[0] : null;
+    const identifier = parts.length > 1 ? parts[1] : parts[0];
+
+    switch (type) {
+        case "mp":
+            return `https://media.discordapp.net/${identifier}`;
+
+        case "twitch":
+            return `https://static-cdn.jtvnw.net/previews-ttv/live_user_${identifier}-1920x1080.jpg`;
+
+        case "youtube":
+            return `https://i.ytimg.com/vi/${identifier}/maxresdefault.jpg`;
+
+        case "spotify":
+            return `https://i.scdn.co/image/${identifier}`;
+
+        default:
+            if (appId && identifier) {
+                return `https://media.discordapp.net/app-assets/${appId}/${identifier}.png`;
+            } else {
+                return null;
+            }
+    }
+}
 
 function toProfileEffect(data: any): ProfileEffect {
     return {
@@ -171,6 +198,9 @@ export function getAssetSource(url: URL): AssetSource {
     const isImageExt = isImageExt1 || isImageExt2;
     const isWikimedia = url.origin === WIKIMEDIA_DOMAIN_BASE.origin;
     const isTwitter = url.origin === TWITTER_DOMAIN_BASE.origin;
+    const isTwitch = url.origin === TWITCH_THUMBNAIL_BASE.origin;
+    const isYouTube = url.origin === YOUTUBE_THUMBNAIL_BASE.origin;
+    const isSpotify = url.origin === SPOTIFY_THUMBNAIL_BASE.origin;
     const isTenor = [TENOR_BASE_1.origin, TENOR_BASE_2.origin].includes(url.origin);
     const isVencord = [VENCORD_BASE.origin, VENCORD_BADGES_BASE.origin].includes(url.origin);
     const isEquicord = [EQUICORD_BASE.origin, EQUICORD_IMAGES_BASE.origin].includes(url.origin);
@@ -189,6 +219,12 @@ export function getAssetSource(url: URL): AssetSource {
         return AssetSource.WIKIMEDIA;
     } else if (isTwitter) {
         return AssetSource.TWITTER;
+    } else if (isTwitch) {
+        return AssetSource.TWITCH;
+    } else if (isYouTube) {
+        return AssetSource.YOUTUBE;
+    } else if (isSpotify) {
+        return AssetSource.SPOTIFY;
     } else if (isTenor) {
         return AssetSource.TENOR;
     } else if (isVencord || isEquicord) {
@@ -342,6 +378,14 @@ export function parseDiscordURLs(url: ParsedURL, asset: AssetInfo) {
         url.url.host = ASSET_MEDIA_PROXY_BASE.host;
         url.source = AssetSource.ASSET_MEDIA_PROXY;
         asset.classifier = AssetType.USER_BANNER;
+    } else if (detectedPrimary === "external") {
+        url.url.host = ASSET_MEDIA_PROXY_BASE.host;
+        url.source = AssetSource.EXTERNAL_ASSET_PROXY;
+        asset.classifier = AssetType.GENERIC_STATIC;
+    } else if (["app-assets", "app-icons", "application-directory"].includes(detectedPrimary)) {
+        url.url.host = ASSET_MEDIA_PROXY_BASE.host;
+        url.source = AssetSource.ASSET_MEDIA_PROXY;
+        asset.classifier = AssetType.APPLICATION_ASSET;
     } else if (detectedPrimary === "assets/collectibles/nameplates") {
         url.url.host = CDN_BASE.host;
         url.source = AssetSource.CDN;
